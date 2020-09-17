@@ -32,4 +32,5 @@
 *.app
 Debug
 PriorityBooster/.vs
+.vs
 /Booster/*.user
