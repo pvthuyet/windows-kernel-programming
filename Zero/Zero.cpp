@@ -1,5 +1,7 @@
 #include "pch.h"
 #include "ZeroCommon.h"
+#include "..\include\ke_logger.h"
+#define DRIVER_PREFIX	"[Zero] "
 
 // global variable
 long long g_TotalRead{0}, g_TotalWritten{0};
