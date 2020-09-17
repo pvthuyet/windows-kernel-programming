@@ -1,7 +1,5 @@
 #include "pch.h"
 
-#define DRIVER_PREFIX	"Zero: "
-
 // Prototypes
 void ZeroUnload(_In_ PDRIVER_OBJECT DriverObject);
 DRIVER_DISPATCH ZeroCreateClose, ZeroRead, ZeroWrite;
@@ -9,7 +7,7 @@ DRIVER_DISPATCH ZeroCreateClose, ZeroRead, ZeroWrite;
 extern "C" NTSTATUS
 DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)
 {
-	KdPrint((DRIVER_PREFIX "DriverEntry ENTER\n"));
+	LOGENTER;
 	UNREFERENCED_PARAMETER(RegistryPath);
 
 	DriverObject->DriverUnload = ZeroUnload;
@@ -57,7 +55,7 @@ DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)
 		}
 	}
 
-	KdPrint((DRIVER_PREFIX "DriverEntry EXIT\n"));
+	LOGEXIT;
 	return status;
 }
 
@@ -88,10 +86,11 @@ NTSTATUS ZeroCreateClose(_In_ PDEVICE_OBJECT DeviceObject, _In_ PIRP Irp)
 _Use_decl_annotations_
 NTSTATUS ZeroRead(_In_ PDEVICE_OBJECT DeviceObject, _In_ PIRP Irp)
 {
-	KdPrint((DRIVER_PREFIX "ZeroRead ENTER\n"));
+	LOGENTER;
 	UNREFERENCED_PARAMETER(DeviceObject);
 	auto stack = IoGetCurrentIrpStackLocation(Irp);
 	auto len = stack->Parameters.Read.Length;
+	KE_DBG_PRINT(KEDBG_TRACE_ROUTINES, (DRIVER_PREFIX "Read file length: %lu\n", len));
 	if (0 == len)
 	{
 		return CompleteIrp(Irp, STATUS_INVALID_BUFFER_SIZE);
@@ -104,8 +103,8 @@ NTSTATUS ZeroRead(_In_ PDEVICE_OBJECT DeviceObject, _In_ PIRP Irp)
 	}
 
 	RtlZeroMemory(buffer, len);
-	KdPrint((DRIVER_PREFIX "ZeroRead EXIT\n"));
-	return CompleteIrp(Irp, STATUS_SUCCESS);
+	LOGEXIT;
+	return CompleteIrp(Irp, STATUS_SUCCESS, len);
 }
 
 _Use_decl_annotations_

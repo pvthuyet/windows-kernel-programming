@@ -187,6 +187,7 @@
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\include\ke_logger.h" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>

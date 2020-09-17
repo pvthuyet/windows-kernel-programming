@@ -56,6 +56,10 @@ int main()
 	{
 		std::cout << "Wrong data\n";
 	}
+	else
+	{
+		std::cout << "Zero driver clear data successful\n";
+	}
 
 	// Test write
 	BYTE buffer2[1024] = { 0 };
