@@ -86,22 +86,30 @@ NTSTATUS PriorityBoosterDeviceControl(_In_ PDEVICE_OBJECT DeviceObject, _In_ PIR
 				break;
 			}
 
-			if (data->Priority < 1 || data->Priority > 31)
+			__try
 			{
-				status = STATUS_INVALID_PARAMETER;
-				break;
-			}
+				if (data->Priority < 1 || data->Priority > 31)
+				{
+					status = STATUS_INVALID_PARAMETER;
+					break;
+				}
 
-			PETHREAD Thread = nullptr;
-			status = PsLookupThreadByThreadId(ULongToHandle(data->ThreadId), &Thread);
-			if (!NT_SUCCESS(status))
+				PETHREAD Thread = nullptr;
+				status = PsLookupThreadByThreadId(ULongToHandle(data->ThreadId), &Thread);
+				if (!NT_SUCCESS(status))
+				{
+					break;
+				}
+
+				KeSetPriorityThread(Thread, data->Priority);
+				ObDereferenceObject(Thread);
+				KdPrint(("Thread Priority change for %d to %d succeeded!\n", data->ThreadId, data->Priority));
+			}
+			__except (EXCEPTION_EXECUTE_HANDLER)
 			{
-				break;
+				// something wrong with the buffer
+				status = STATUS_ACCESS_VIOLATION;
 			}
-
-			KeSetPriorityThread(Thread, data->Priority);
-			ObDereferenceObject(Thread);
-			KdPrint(("Thread Priority change for %d to %d succeeded!\n", data->ThreadId, data->Priority));
 		}
 		break;
 

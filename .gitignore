@@ -34,3 +34,4 @@ Debug
 PriorityBooster/.vs
 .vs
 /Booster/*.user
+*.user
