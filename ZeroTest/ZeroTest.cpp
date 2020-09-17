@@ -28,6 +28,7 @@ int main()
 	}
 
 	// Test read
+	std::cout << "Test read\n";
 	BYTE buffer[64] = { 0 };
 	for (int i = 0; i < sizeof(buffer); ++i)
 	{
@@ -43,7 +44,7 @@ int main()
 
 	if (sizeof(buffer) != bytes)
 	{
-		printf_s("Wrong number of bytes (buffer size: %d, read bytes: %d)\n", sizeof(buffer), bytes);
+		printf_s("Wrong number of bytes (buffer size: %zu, read bytes: %lu)\n", sizeof(buffer), bytes);
 	}
 
 	// check if buffer data sum is zero
@@ -58,10 +59,11 @@ int main()
 	}
 	else
 	{
-		std::cout << "Zero driver clear data successful\n";
+		printf_s("Read number of bytes %lu\n", bytes);
 	}
 
 	// Test write
+	std::cout << "Test write\n";
 	BYTE buffer2[1024] = { 0 };
 	ok = ::WriteFile(unr.get(), buffer2, sizeof(buffer2), &bytes, nullptr);
 	if (!ok)
@@ -72,6 +74,10 @@ int main()
 	if (sizeof(buffer2) != bytes)
 	{
 		std::cout << "Wrong byte count\n";
+	}
+	else
+	{
+		printf_s("Write number of bytes %lu\n", bytes);
 	}
 	return 0;
 }

@@ -30,6 +30,9 @@
     <ClInclude Include="..\include\ke_logger.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ZeroCommon.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">

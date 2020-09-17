@@ -189,6 +189,7 @@
   <ItemGroup>
     <ClInclude Include="..\include\ke_logger.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="ZeroCommon.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp" />
