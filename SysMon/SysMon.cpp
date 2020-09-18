@@ -191,13 +191,64 @@ VOID SysMonUnload(PDRIVER_OBJECT DriverObject)
 
 VOID OnProcessNotify(_Inout_ PEPROCESS Process, _In_ HANDLE ProcessId, _Inout_opt_ PPS_CREATE_NOTIFY_INFO CreateInfo)
 {
+	LOGENTER;
 	UNREFERENCED_PARAMETER(Process);
-	UNREFERENCED_PARAMETER(ProcessId);
-	UNREFERENCED_PARAMETER(CreateInfo);
+	if (CreateInfo)
+	{
+		// Process created
+		USHORT allocSize = sizeof(FullItem<ProcessCreateInfo>);
+		USHORT commandLineSize = 0;
+		if (CreateInfo->CommandLine)
+		{
+			commandLineSize = CreateInfo->CommandLine->Length;
+			allocSize += commandLineSize;
+		}
+		auto info = (FullItem<ProcessCreateInfo>*)ExAllocatePoolWithTag(PagedPool, allocSize, DRIVER_TAG);
+		if (nullptr == info)
+		{
+			KdPrint((DRIVER_PREFIX "failed allocation\n"));
+			return;
+		}
+		auto& item = info->Data;
+		KeQuerySystemTimePrecise(&item.Time);
+		item.Type = ItemType::ProcessCreate;
+		item.Size = sizeof(ProcessCreateInfo) + commandLineSize;
+		item.ProcessId = HandleToULong(ProcessId);
+		item.ParentProcessId = HandleToULong(CreateInfo->ParentProcessId);
+		if (commandLineSize > 0)
+		{
+			memcpy_s((UCHAR*)&item + sizeof(item), commandLineSize, CreateInfo->CommandLine->Buffer, commandLineSize);
+			item.CommandLineLength = commandLineSize / sizeof(WCHAR);
+			item.CommandLineOffset = sizeof(item);
+		}
+		else
+		{
+			item.CommandLineLength = 0;
+		}
+		PushItem(&info->Entry);
+	}
+	else
+	{
+		// Process exited
+		auto info = (FullItem<ProcessExitInfo>*)ExAllocatePoolWithTag(PagedPool, sizeof(FullItem<ProcessExitInfo>), DRIVER_TAG);
+		if (nullptr == info)
+		{
+			KdPrint((DRIVER_PREFIX "failed allocation\n"));
+			return;
+		}
+		auto& item = info->Data;
+		KeQuerySystemTimePrecise(&item.Time);
+		item.Type = ItemType::ProcessExit;
+		item.Size = sizeof(ProcessExitInfo);
+		item.ProcessId = HandleToULong(ProcessId);
+		PushItem(&info->Entry);
+	}
+	LOGEXIT;
 }
 
 VOID OnThreadNotify(_In_ HANDLE ProcessId, _In_ HANDLE ThreadId, _In_ BOOLEAN Create)
 {
+	LOGENTER;
 	auto size = sizeof(FullItem<ThreadCreateExitInfo>);
 	auto info = (FullItem<ThreadCreateExitInfo>*)ExAllocatePoolWithTag(PagedPool, size, DRIVER_TAG);
 	if (nullptr == info)
@@ -213,13 +264,43 @@ VOID OnThreadNotify(_In_ HANDLE ProcessId, _In_ HANDLE ThreadId, _In_ BOOLEAN Cr
 	item.ThreadId = HandleToUlong(ThreadId);
 
 	PushItem(&info->Entry);
+	LOGEXIT;
 }
 
 VOID OnImageLoadNotify(_In_opt_ PUNICODE_STRING FullImageName, _In_ HANDLE ProcessId, _In_ PIMAGE_INFO ImageInfo)
 {
-	UNREFERENCED_PARAMETER(FullImageName);
-	UNREFERENCED_PARAMETER(ProcessId);
-	UNREFERENCED_PARAMETER(ImageInfo);
+	LOGENTER;
+	if (nullptr == ProcessId)
+	{
+		return;
+	}
+	auto size = sizeof(FullItem<ImageLoadInfo>);
+	auto info = (FullItem<ImageLoadInfo>*)ExAllocatePoolWithTag(PagedPool, size, DRIVER_TAG);
+	if (nullptr == info)
+	{
+		KdPrint((DRIVER_PREFIX "Failed to allocate memory\n"));
+		return;
+	}
+	RtlZeroMemory(info, size);
+
+	auto& item = info->Data;
+	KeQuerySystemTimePrecise(&item.Time);
+	item.Size = sizeof(item);
+	item.Type = ItemType::ImageLoad;
+	item.ProcessId = HandleToULong(ProcessId);
+	item.ImageSize = ImageInfo->ImageSize;
+	item.LoadAddress = ImageInfo->ImageBase;
+
+	if (FullImageName)
+	{
+		memcpy_s(item.ImageFileName, MaxImageFileSize * sizeof(WCHAR), FullImageName->Buffer, FullImageName->Length);
+	}
+	else
+	{
+		wcscpy_s(item.ImageFileName, L"(unknown)");
+	}
+	PushItem(&info->Entry);
+	LOGEXIT;
 }
 
 VOID PushItem(LIST_ENTRY* entry)

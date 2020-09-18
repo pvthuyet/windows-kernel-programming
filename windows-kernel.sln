@@ -13,6 +13,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ZeroTest", "ZeroTest\ZeroTe
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SysMon", "SysMon\SysMon.vcxproj", "{274EEF16-1D06-4FD6-91CA-D06B4B8F56A6}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SysMonClient", "SysMonClient\SysMonClient.vcxproj", "{E936A2BB-6216-4726-907E-64710C6FB29E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM = Debug|ARM
@@ -121,6 +123,18 @@ Global
 		{274EEF16-1D06-4FD6-91CA-D06B4B8F56A6}.Release|x86.ActiveCfg = Release|Win32
 		{274EEF16-1D06-4FD6-91CA-D06B4B8F56A6}.Release|x86.Build.0 = Release|Win32
 		{274EEF16-1D06-4FD6-91CA-D06B4B8F56A6}.Release|x86.Deploy.0 = Release|Win32
+		{E936A2BB-6216-4726-907E-64710C6FB29E}.Debug|ARM.ActiveCfg = Debug|Win32
+		{E936A2BB-6216-4726-907E-64710C6FB29E}.Debug|ARM64.ActiveCfg = Debug|Win32
+		{E936A2BB-6216-4726-907E-64710C6FB29E}.Debug|x64.ActiveCfg = Debug|x64
+		{E936A2BB-6216-4726-907E-64710C6FB29E}.Debug|x64.Build.0 = Debug|x64
+		{E936A2BB-6216-4726-907E-64710C6FB29E}.Debug|x86.ActiveCfg = Debug|Win32
+		{E936A2BB-6216-4726-907E-64710C6FB29E}.Debug|x86.Build.0 = Debug|Win32
+		{E936A2BB-6216-4726-907E-64710C6FB29E}.Release|ARM.ActiveCfg = Release|Win32
+		{E936A2BB-6216-4726-907E-64710C6FB29E}.Release|ARM64.ActiveCfg = Release|Win32
+		{E936A2BB-6216-4726-907E-64710C6FB29E}.Release|x64.ActiveCfg = Release|x64
+		{E936A2BB-6216-4726-907E-64710C6FB29E}.Release|x64.Build.0 = Release|x64
+		{E936A2BB-6216-4726-907E-64710C6FB29E}.Release|x86.ActiveCfg = Release|Win32
+		{E936A2BB-6216-4726-907E-64710C6FB29E}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
