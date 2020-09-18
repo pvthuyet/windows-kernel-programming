@@ -16,3 +16,31 @@ struct ItemHeader
 	USHORT Size;
 	LARGE_INTEGER Time;
 };
+
+struct ProcessExitInfo : ItemHeader
+{
+	ULONG ProcessId;
+};
+
+struct ProcessCreateInfo : ItemHeader
+{
+	ULONG ProcessId;
+	ULONG ParentProcessId;
+	USHORT CommandLineLength;
+	USHORT CommandLineOffset;
+};
+
+struct ThreadCreateExitInfo : ItemHeader
+{
+	ULONG ThreadId;
+	ULONG ProcessId;
+};
+
+constexpr int MaxImageFileSize = 300;
+struct ImageLoadInfo : ItemHeader
+{
+	ULONG ProcessId;
+	void* LoadAddress;
+	ULONG_PTR ImageSize;
+	WCHAR ImageFileName[MaxImageFileSize + 1];
+};
