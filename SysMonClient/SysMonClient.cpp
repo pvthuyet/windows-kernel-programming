@@ -69,21 +69,26 @@ void DisplayInfo(BYTE* buffer, DWORD size)
 
         case ItemType::ThreadCreate:
             {
-                DisplayTime(header->Time);
-                auto info = (ThreadCreateExitInfo*)buffer;
-                printf_s("Thread %d created in process %d\n", info->ThreadId, info->ProcessId);
+                //DisplayTime(header->Time);
+                //auto info = (ThreadCreateExitInfo*)buffer;
+                //printf_s("Thread %d created in process %d\n", info->ThreadId, info->ProcessId);
             }
             break;
 
         case ItemType::ThreadExit:
             {
-                DisplayTime(header->Time);
-                auto info = (ThreadCreateExitInfo*)buffer;
-                printf_s("Thread %d exited from process %d\n", info->ThreadId, info->ProcessId);
+                //DisplayTime(header->Time);
+                //auto info = (ThreadCreateExitInfo*)buffer;
+                //printf_s("Thread %d exited from process %d\n", info->ThreadId, info->ProcessId);
             }
             break;
 
         case ItemType::ImageLoad:
+            {
+                DisplayTime(header->Time);
+                auto info = (ImageLoadInfo*)buffer;
+                printf_s("Image loaded into process %d at address 0x%p (%ws)\n", info->ProcessId, info->LoadAddress, info->ImageFileName);
+            }
             break;
 
         default:
