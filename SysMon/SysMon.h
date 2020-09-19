@@ -10,6 +10,7 @@ struct Globals
 	LIST_ENTRY ItemsHead;
 	int ItemCount;
 	FastMutex Mutex;
+	LARGE_INTEGER RegCookie;
 };
 
 template<typename T>

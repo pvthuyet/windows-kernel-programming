@@ -10,6 +10,7 @@ VOID OnProcessNotify(_Inout_ PEPROCESS Process, _In_ HANDLE ProcessId, _Inout_op
 VOID OnThreadNotify(_In_ HANDLE ProcessId, _In_ HANDLE ThreadId, _In_ BOOLEAN Create);
 VOID OnImageLoadNotify(_In_opt_ PUNICODE_STRING FullImageName, _In_ HANDLE ProcessId, _In_ PIMAGE_INFO ImageInfo);
 VOID PushItem(LIST_ENTRY* entry);
+EX_CALLBACK_FUNCTION OnRegistryNotify;
 
 Globals g_Globals;
 
@@ -27,7 +28,7 @@ DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)
 	PDEVICE_OBJECT DeviceObject = nullptr;
 	UNICODE_STRING symLink = RTL_CONSTANT_STRING(L"\\??\\sysmon");
 	bool symLinkCreated = false;
-	bool processCallbacks = false, threadCallbacks = false;
+	bool processCallbacks = false, threadCallbacks = false, loadImageCallback = false;
 
 	do
 	{
@@ -70,11 +71,24 @@ DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)
 			KdPrint((DRIVER_PREFIX "failed to set image load callback (status=%08X)\n", status));
 			break;
 		}
+		loadImageCallback = true;
+
+		UNICODE_STRING altitude = RTL_CONSTANT_STRING(L"7657.124");
+		status = CmRegisterCallbackEx(OnRegistryNotify, &altitude, DriverObject, nullptr, &g_Globals.RegCookie, nullptr);
+		if (!NT_SUCCESS(status))
+		{
+			KdPrint((DRIVER_PREFIX "failed to set registry callback (status=%08X)\n", status));
+			break;
+		}
 
 	} while(false);
 
 	if (!NT_SUCCESS(status))
 	{
+		if (loadImageCallback)
+		{
+			PsRemoveLoadImageNotifyRoutine(OnImageLoadNotify);
+		}
 		if (threadCallbacks)
 		{
 			PsRemoveCreateThreadNotifyRoutine(OnThreadNotify);
@@ -99,6 +113,27 @@ DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)
 
 	LOGEXIT;
 	return status;
+}
+
+VOID SysMonUnload(PDRIVER_OBJECT DriverObject)
+{
+	LOGENTER;
+	CmUnRegisterCallback(g_Globals.RegCookie);
+	PsRemoveLoadImageNotifyRoutine(OnImageLoadNotify);
+	PsRemoveCreateThreadNotifyRoutine(OnThreadNotify);
+	PsSetCreateProcessNotifyRoutineEx(OnProcessNotify, TRUE);
+
+	UNICODE_STRING symLink = RTL_CONSTANT_STRING(L"\\??\\sysmon");
+	IoDeleteSymbolicLink(&symLink);
+	IoDeleteDevice(DriverObject->DeviceObject);
+
+	while (!IsListEmpty(&g_Globals.ItemsHead))
+	{
+		auto entry = RemoveHeadList(&g_Globals.ItemsHead);
+		ExFreePool(CONTAINING_RECORD(entry, FullItem<ItemHeader>, Entry));
+	}
+
+	LOGEXIT;
 }
 
 NTSTATUS SysMonCreateClose(PDEVICE_OBJECT DeviceObject, PIRP Irp)
@@ -167,26 +202,6 @@ NTSTATUS SysMonRead(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 
 	LOGEXIT;
 	return status;
-}
-
-VOID SysMonUnload(PDRIVER_OBJECT DriverObject)
-{
-	LOGENTER;
-	PsRemoveLoadImageNotifyRoutine(OnImageLoadNotify);
-	PsRemoveCreateThreadNotifyRoutine(OnThreadNotify);
-	PsSetCreateProcessNotifyRoutineEx(OnProcessNotify, TRUE);
-
-	UNICODE_STRING symLink = RTL_CONSTANT_STRING(L"\\??\\sysmon");
-	IoDeleteSymbolicLink(&symLink);
-	IoDeleteDevice(DriverObject->DeviceObject);
-
-	while (!IsListEmpty(&g_Globals.ItemsHead))
-	{
-		auto entry = RemoveHeadList(&g_Globals.ItemsHead);
-		ExFreePool(CONTAINING_RECORD(entry, FullItem<ItemHeader>, Entry));
-	}
-
-	LOGEXIT;
 }
 
 VOID OnProcessNotify(_Inout_ PEPROCESS Process, _In_ HANDLE ProcessId, _Inout_opt_ PPS_CREATE_NOTIFY_INFO CreateInfo)
@@ -301,6 +316,63 @@ VOID OnImageLoadNotify(_In_opt_ PUNICODE_STRING FullImageName, _In_ HANDLE Proce
 	}
 	PushItem(&info->Entry);
 	LOGEXIT;
+}
+
+NTSTATUS OnRegistryNotify(PVOID context, PVOID arg1, PVOID arg2)
+{
+	LOGENTER;
+	UNREFERENCED_PARAMETER(context);
+	static constexpr WCHAR machine[] = L"\\REGISTRY\\MACHINE\\";
+	switch ((REG_NOTIFY_CLASS)(ULONG_PTR)arg1)
+	{
+	case RegNtPostSetValueKey:
+		{
+			auto args = static_cast<REG_POST_OPERATION_INFORMATION*>(arg2);
+			if (!NT_SUCCESS(args->Status))
+			{
+				break;
+			}
+			PCUNICODE_STRING name;
+			auto status = CmCallbackGetKeyObjectIDEx(&g_Globals.RegCookie, args->Object, nullptr, &name, 0);
+			if (!NT_SUCCESS(status))
+			{
+				break;
+			}
+			auto cmp = wcsncmp(name->Buffer, machine, ARRAYSIZE(machine)-1);
+			if (0 == cmp)
+			{
+				auto preInfo = (REG_SET_VALUE_KEY_INFORMATION*)args->PreInformation;
+				NT_ASSERT(preInfo);
+				auto size = sizeof(FullItem<RegistrySetValueInfo>);
+				auto info = (FullItem<RegistrySetValueInfo>*)ExAllocatePoolWithTag(PagedPool, size, DRIVER_TAG);
+				if (nullptr == info)
+				{
+					break;
+				}
+				RtlZeroMemory(info, size);
+				auto& item = info->Data;
+				KeQuerySystemTimePrecise(&item.Time);
+				item.Size = sizeof(item);
+				item.Type = ItemType::RegistrySetValue;
+				wcsncpy_s(item.KeyName, name->Buffer, name->Length/sizeof(WCHAR));
+				wcsncpy_s(item.ValueName, preInfo->ValueName->Buffer, preInfo->ValueName->Length / sizeof(WCHAR));
+				item.DataType = preInfo->Type;
+				item.DataSize = preInfo->DataSize;
+				item.ProcessId = HandleToULong(PsGetCurrentProcessId());
+				item.ThreadId = HandleToULong(PsGetCurrentThreadId());
+				memcpy_s(item.Data, sizeof(item.Data), preInfo->Data, item.DataSize);
+				PushItem(&info->Entry);
+			}
+			CmCallbackReleaseKeyObjectIDEx(name);
+		}
+		break;
+
+	default:
+		break;
+	}
+	
+	LOGEXIT;
+	return STATUS_SUCCESS;
 }
 
 VOID PushItem(LIST_ENTRY* entry)

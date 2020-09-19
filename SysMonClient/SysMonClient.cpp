@@ -9,6 +9,7 @@
 int Error(const char*);
 void DisplayTime(const LARGE_INTEGER& time);
 void DisplayInfo(BYTE* buffer, DWORD size);
+void DisplayBinary(const UCHAR*, DWORD);
 
 int main()
 {
@@ -91,6 +92,39 @@ void DisplayInfo(BYTE* buffer, DWORD size)
             }
             break;
 
+        case ItemType::RegistrySetValue:
+            {
+                DisplayTime(header->Time);
+                auto info = (RegistrySetValueInfo*)buffer;
+                printf_s("Registry write PID=%d: %ws\\%ws type: %d size: %d data: ", 
+                    info->ProcessId,
+                    info->KeyName, 
+                    info->ValueName, 
+                    info->DataType, 
+                    info->DataSize);
+
+                switch (info->DataType)
+                {
+                case REG_DWORD:
+                    printf_s("0x%08X\n", *(DWORD*)info->Data);
+                    break;
+
+                case REG_SZ:
+                case REG_EXPAND_SZ:
+                    printf_s("%ws\n", (WCHAR*)info->Data);
+                    break;
+
+                case REG_BINARY:
+                    DisplayBinary(info->Data, min(info->DataSize, sizeof(info->Data)));
+                    break;
+
+                default:
+                    DisplayBinary(info->Data, min(info->DataSize, sizeof(info->Data)));
+                    break;
+                }
+            }
+            break;
+
         default:
             break;
         }
@@ -104,6 +138,15 @@ void DisplayTime(const LARGE_INTEGER& time)
     SYSTEMTIME st;
     ::FileTimeToSystemTime((FILETIME*)&time, &st);
     printf_s("%02d:%02d:%02d:%03d: ", st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
+}
+
+void DisplayBinary(const UCHAR* buffer, DWORD size)
+{
+    for (DWORD i = 0; i < size; ++i)
+    {
+        printf_s("%02X ", buffer[i]);
+    }
+    printf_s("\n");
 }
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu
 // Debug program: F5 or Debug > Start Debugging menu

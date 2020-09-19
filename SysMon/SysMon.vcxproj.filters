@@ -24,30 +24,30 @@
     </Inf>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="pch.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="SysMon.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="FastMutex.cpp">
+    <ClCompile Include="..\include\FastMutex.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\include\pch.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="pch.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="FastMutex.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="AutoLock.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="SysMon.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="SysMonCommon.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\AutoLock.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\FastMutex.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\pch.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

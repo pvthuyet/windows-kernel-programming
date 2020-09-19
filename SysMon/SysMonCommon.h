@@ -7,7 +7,8 @@ enum class ItemType : short
 	ProcessExit,
 	ThreadCreate,
 	ThreadExit,
-	ImageLoad
+	ImageLoad,
+	RegistrySetValue
 };
 
 struct ItemHeader
@@ -43,4 +44,15 @@ struct ImageLoadInfo : ItemHeader
 	void* LoadAddress;
 	ULONG_PTR ImageSize;
 	WCHAR ImageFileName[MaxImageFileSize + 1];
+};
+
+struct RegistrySetValueInfo : ItemHeader
+{
+	ULONG ProcessId;
+	ULONG ThreadId;
+	WCHAR KeyName[256];		// full key name
+	WCHAR ValueName[64];	// value name
+	ULONG DataType;			// REG_xxx
+	UCHAR Data[128];		// data
+	ULONG DataSize;			// size of data
 };
