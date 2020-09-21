@@ -22,12 +22,18 @@
     <ClCompile Include="ProcessProtect.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\include\FastMutex.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ProcessProtect.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ProcessProtectCommon.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\FastMutex.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
