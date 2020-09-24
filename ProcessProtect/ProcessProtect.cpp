@@ -19,7 +19,6 @@ NTSTATUS DriverEntry(_In_ PDRIVER_OBJECT DriverObject, _In_ PUNICODE_STRING Regi
 {
 	LOGENTER;
 	g_Data.Init();
-	UNREFERENCED_PARAMETER(DriverObject);
 	UNREFERENCED_PARAMETER(RegisteryPath);
 
 	OB_OPERATION_REGISTRATION operations[] = {
