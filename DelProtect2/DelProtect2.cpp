@@ -16,9 +16,26 @@ Environment:
 
 #include <fltKernel.h>
 #include <dontuse.h>
+#include "DelProtect2.h"
+#include "..\include\AutoLock.h"
+#include "..\include\FastMutex.h"
+#include "..\include\ke_logger.h"
+#include "DelProtectCommon.h"
+
+extern "C" NTSTATUS ZwQueryInformationProcess(
+    _In_      HANDLE           ProcessHandle,
+    _In_      PROCESSINFOCLASS ProcessInformationClass,
+    _Out_     PVOID            ProcessInformation,
+    _In_      ULONG            ProcessInformationLength,
+    _Out_opt_ PULONG           ReturnLength
+);
 
 #pragma prefast(disable:__WARNING_ENCODE_MEMBER_FUNCTION_POINTER, "Not valid for kernel mode drivers")
 
+constexpr int MaxExecutables = 32;
+WCHAR* ExeNames[MaxExecutables] = { 0 };
+int ExeNamesCount{ 0 };
+FastMutex ExeNamesLock;
 
 PFLT_FILTER gFilterHandle;
 ULONG_PTR OperationStatusCtx = 1;
@@ -37,8 +54,28 @@ ULONG gTraceFlags = 0;
 /*************************************************************************
     Prototypes
 *************************************************************************/
+bool FindExecutable(PCWSTR name);
 
 EXTERN_C_START
+
+DRIVER_DISPATCH DelProtectCreateClose, DelProtectDeviceControl;
+DRIVER_UNLOAD DelProtectUnloadDriver;
+
+void ClearAll();
+
+FLT_PREOP_CALLBACK_STATUS
+DelProtect2PreCreate(
+    _Inout_ PFLT_CALLBACK_DATA Data,
+    _In_ PCFLT_RELATED_OBJECTS FltObjects,
+    _Flt_CompletionContext_Outptr_ PVOID* CompletionContext
+);
+
+FLT_PREOP_CALLBACK_STATUS
+DelProtect2PreSetInformation(
+    _Inout_ PFLT_CALLBACK_DATA Data,
+    _In_ PCFLT_RELATED_OBJECTS FltObjects,
+    _Flt_CompletionContext_Outptr_ PVOID* CompletionContext
+);
 
 DRIVER_INITIALIZE DriverEntry;
 NTSTATUS
@@ -886,4 +923,36 @@ Return Value:
               ((iopb->MajorFunction == IRP_MJ_DIRECTORY_CONTROL) &&
                (iopb->MinorFunction == IRP_MN_NOTIFY_CHANGE_DIRECTORY))
              );
+}
+
+bool FindExecutable(PCWSTR name)
+{
+    AutoLock locker(ExeNamesLock);
+    if (0 == ExeNamesCount)
+    {
+        return false;
+    }
+
+    for (int i = 0; i < MaxExecutables; ++i)
+    {
+        if (ExeNames[i] && 0 == _wcsicmp(ExeNames[i], name))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+void ClearAll()
+{
+    AutoLock locker(ExeNamesLock);
+    for (int i = 0; i < MaxExecutables; ++i)
+    {
+        if (ExeNames[i])
+        {
+            ExFreePool(ExeNames[i]);
+            ExeNames[i] = nullptr;
+        }
+    }
+    ExeNamesCount = 0;
 }
