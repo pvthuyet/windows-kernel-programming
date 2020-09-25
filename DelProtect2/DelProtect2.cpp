@@ -604,8 +604,8 @@ Return Value:
 
     // create a standard device object and symbolic link
     PDEVICE_OBJECT DeviceObject = nullptr;
-    UNICODE_STRING devName = RTL_CONSTANT_STRING(L"\\device\\delprotect2");
-    UNICODE_STRING symLink = RTL_CONSTANT_STRING(L"\\??\\delprotect2");
+    UNICODE_STRING devName = RTL_CONSTANT_STRING(DEVICE_NAME);
+    UNICODE_STRING symLink = RTL_CONSTANT_STRING(SYM_LINK_NAME);
     auto symLinkCreated = false;
     do
     {
@@ -1077,7 +1077,7 @@ DelProtect2PreSetInformation(
 
         if (NT_SUCCESS(status) && processName->Length > 0)
         {
-            KdPrint(("Delete operation from %wZ\n"));
+            KdPrint(("Delete operation from %wZ\n", processName));
             auto exeName = ::wcsrchr(processName->Buffer, L'\\');
             if (exeName && FindExecutable(exeName + 1)) 	// skip backslash
             {
@@ -1097,7 +1097,7 @@ DelProtect2PreSetInformation(
 VOID DelProtect2UnloadDriver(PDRIVER_OBJECT DriverObject)
 {
     ClearAll();
-    UNICODE_STRING symLink = RTL_CONSTANT_STRING(L"\\??\\delprotect");
+    UNICODE_STRING symLink = RTL_CONSTANT_STRING(SYM_LINK_NAME);
     IoDeleteSymbolicLink(&symLink);
     IoDeleteDevice(DriverObject->DeviceObject);
 }
