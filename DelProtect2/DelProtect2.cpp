@@ -37,7 +37,7 @@ WCHAR* ExeNames[MaxExecutables] = { 0 };
 int ExeNamesCount{ 0 };
 FastMutex ExeNamesLock;
 
-PFLT_FILTER gFilterHandle;
+PFLT_FILTER gFilterHandle = nullptr;
 ULONG_PTR OperationStatusCtx = 1;
 
 #define PTDBG_TRACE_ROUTINES            0x00000001
@@ -55,13 +55,13 @@ ULONG gTraceFlags = 0;
     Prototypes
 *************************************************************************/
 bool FindExecutable(PCWSTR name);
+void ClearAll();
 
 EXTERN_C_START
 
-DRIVER_DISPATCH DelProtectCreateClose, DelProtectDeviceControl;
-DRIVER_UNLOAD DelProtectUnloadDriver;
+DRIVER_DISPATCH DelProtect2CreateClose, DelProtect2DeviceControl;
+DRIVER_UNLOAD DelProtect2UnloadDriver;
 
-void ClearAll();
 
 FLT_PREOP_CALLBACK_STATUS
 DelProtect2PreCreate(
@@ -170,6 +170,16 @@ EXTERN_C_END
 //
 
 CONST FLT_OPERATION_REGISTRATION Callbacks[] = {
+
+    { IRP_MJ_CREATE, 
+    0, 
+    DelProtect2PreCreate, 
+    nullptr },
+
+    { IRP_MJ_SET_INFORMATION, 
+    0, 
+    DelProtect2PreSetInformation, 
+    nullptr },
 
 #if 0 // TODO - List all of the requests to filter.
     { IRP_MJ_CREATE,
@@ -592,27 +602,68 @@ Return Value:
     PT_DBG_PRINT( PTDBG_TRACE_ROUTINES,
                   ("DelProtect2!DriverEntry: Entered\n") );
 
-    //
-    //  Register with FltMgr to tell it our callback routines
-    //
+    // create a standard device object and symbolic link
+    PDEVICE_OBJECT DeviceObject = nullptr;
+    UNICODE_STRING devName = RTL_CONSTANT_STRING(L"\\device\\delprotect2");
+    UNICODE_STRING symLink = RTL_CONSTANT_STRING(L"\\??\\delprotect2");
+    auto symLinkCreated = false;
+    do
+    {
+        status = IoCreateDevice(DriverObject, 0, &devName, FILE_DEVICE_UNKNOWN, 0, FALSE, &DeviceObject);
+        if (!NT_SUCCESS(status))
+        {
+            KE_DBG_PRINT(KEDBG_TRACE_ERROR, (DRIVER_PREFIX "Failed IoCreateDevice\n"));
+            break;
+        }
 
-    status = FltRegisterFilter( DriverObject,
-                                &FilterRegistration,
-                                &gFilterHandle );
+        status = IoCreateSymbolicLink(&symLink, &devName);
+        if (!NT_SUCCESS(status))
+        {
+            KE_DBG_PRINT(KEDBG_TRACE_ERROR, (DRIVER_PREFIX "Failed IoCreateSymbolicLink\n"));
+            break;
+        }
+        symLinkCreated = true;
 
-    FLT_ASSERT( NT_SUCCESS( status ) );
+        //
+        //  Register with FltMgr to tell it our callback routines
+        //
 
-    if (NT_SUCCESS( status )) {
+        status = FltRegisterFilter(DriverObject,
+            &FilterRegistration,
+            &gFilterHandle);
+
+        FLT_ASSERT(NT_SUCCESS(status));
+        if (!NT_SUCCESS(status))
+        {
+            KE_DBG_PRINT(KEDBG_TRACE_ERROR, (DRIVER_PREFIX "Failed FltRegisterFilter\n"));
+            break;
+        }
+
+        DriverObject->DriverUnload = DelProtect2UnloadDriver;
+        DriverObject->MajorFunction[IRP_MJ_CREATE] = DriverObject->MajorFunction[IRP_MJ_CLOSE] = DelProtect2CreateClose;
+        DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = DelProtect2DeviceControl;
+        ExeNamesLock.init();
 
         //
         //  Start filtering i/o
         //
+        status = FltStartFiltering(gFilterHandle);
 
-        status = FltStartFiltering( gFilterHandle );
+    } while (false);
 
-        if (!NT_SUCCESS( status )) {
-
-            FltUnregisterFilter( gFilterHandle );
+    if (!NT_SUCCESS(status))
+    {
+        if (gFilterHandle)
+        {
+            FltUnregisterFilter(gFilterHandle);
+        }
+        if (symLinkCreated)
+        {
+            IoDeleteSymbolicLink(&symLink);
+        }
+        if (DeviceObject)
+        {
+            IoDeleteDevice(DeviceObject);
         }
     }
 
@@ -923,6 +974,231 @@ Return Value:
               ((iopb->MajorFunction == IRP_MJ_DIRECTORY_CONTROL) &&
                (iopb->MinorFunction == IRP_MN_NOTIFY_CHANGE_DIRECTORY))
              );
+}
+
+FLT_PREOP_CALLBACK_STATUS
+DelProtect2PreCreate(
+    _Inout_ PFLT_CALLBACK_DATA Data,
+    _In_ PCFLT_RELATED_OBJECTS FltObjects,
+    _Flt_CompletionContext_Outptr_ PVOID* CompletionContext
+)
+{
+    UNREFERENCED_PARAMETER(FltObjects);
+    UNREFERENCED_PARAMETER(CompletionContext);
+    if (Data->RequestorMode == KernelMode)
+    {
+        return FLT_PREOP_SUCCESS_NO_CALLBACK;
+    }
+
+    auto& params = Data->Iopb->Parameters.Create;
+    auto status = FLT_PREOP_SUCCESS_NO_CALLBACK;
+
+    if (params.Options & FILE_DELETE_ON_CLOSE)
+    {
+        // delete operation
+        KdPrint(("Delete on close: %wZ\n", &FltObjects->FileObject->FileName));
+        auto size = 512;	// some arbitrary size
+        auto processName = (UNICODE_STRING*)ExAllocatePool(PagedPool, size);
+        if (nullptr == processName)
+        {
+            return FLT_PREOP_SUCCESS_NO_CALLBACK;
+        }
+        RtlZeroMemory(processName, size);	// ensure string will be NULL-terminated
+
+        auto ntstatus = ZwQueryInformationProcess(NtCurrentProcess(), ProcessImageFileName,
+            processName, size - sizeof(WCHAR), nullptr);
+        if (NT_SUCCESS(ntstatus))
+        {
+            KdPrint(("Delete operation from %wZ\n", processName));
+            auto exeName = ::wcsrchr(processName->Buffer, L'\\');
+            NT_ASSERT(exeName);
+            if (exeName && FindExecutable(exeName + 1)) // skip backslash
+            {
+                Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+                KdPrint(("Prevented delete in IRP_MJ_CREATE\n"));
+                status = FLT_PREOP_COMPLETE;
+            }
+        }
+        ExFreePool(processName);
+    }
+
+    return status;
+}
+
+FLT_PREOP_CALLBACK_STATUS
+DelProtect2PreSetInformation(
+    _Inout_ PFLT_CALLBACK_DATA Data,
+    _In_ PCFLT_RELATED_OBJECTS FltObjects,
+    _Flt_CompletionContext_Outptr_ PVOID* CompletionContext
+)
+{
+    UNREFERENCED_PARAMETER(FltObjects);
+    UNREFERENCED_PARAMETER(CompletionContext);
+
+    if (Data->RequestorMode == KernelMode)
+    {
+        return FLT_PREOP_SUCCESS_NO_CALLBACK;
+    }
+
+    auto& params = Data->Iopb->Parameters.SetFileInformation;
+    if (params.FileInformationClass != FileDispositionInformation 
+        && params.FileInformationClass != FileDispositionInformationEx)
+    {
+        // not a delete operation
+        return FLT_PREOP_SUCCESS_NO_CALLBACK;
+    }
+
+    auto info = (FILE_DISPOSITION_INFORMATION*)params.InfoBuffer;
+    if (!info->DeleteFile)
+    {
+        return FLT_PREOP_SUCCESS_NO_CALLBACK;
+    }
+
+    // what process did this originate from?
+    auto process = PsGetThreadProcess(Data->Thread);
+    NT_ASSERT(process);
+
+    // open a handle
+    HANDLE hProcess = nullptr;
+    auto status = ObOpenObjectByPointer(process, OBJ_KERNEL_HANDLE, nullptr, 0, nullptr, KernelMode, &hProcess);
+    if (!NT_SUCCESS(status))
+    {
+        return FLT_PREOP_SUCCESS_NO_CALLBACK;
+    }
+
+    auto returnStatus = FLT_PREOP_SUCCESS_NO_CALLBACK;
+    auto size = 512;	// some arbitrary size
+    auto processName = (UNICODE_STRING*)ExAllocatePool(PagedPool, size);
+    if (processName)
+    {
+        RtlZeroMemory(processName, size);	// ensure string will be NULL-terminated
+        status = ZwQueryInformationProcess(hProcess, ProcessImageFileName,
+            processName, size - sizeof(WCHAR), nullptr);
+
+        if (NT_SUCCESS(status) && processName->Length > 0)
+        {
+            KdPrint(("Delete operation from %wZ\n"));
+            auto exeName = ::wcsrchr(processName->Buffer, L'\\');
+            if (exeName && FindExecutable(exeName + 1)) 	// skip backslash
+            {
+                // prevent delete
+                Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+                returnStatus = FLT_PREOP_COMPLETE;
+                KdPrint(("Prevented delete in IRP_MJ_SET_INFORMATION\n"));
+            }
+        }
+        ExFreePool(processName);
+    }
+    ZwClose(hProcess);
+
+    return returnStatus;
+}
+
+VOID DelProtect2UnloadDriver(PDRIVER_OBJECT DriverObject)
+{
+    ClearAll();
+    UNICODE_STRING symLink = RTL_CONSTANT_STRING(L"\\??\\delprotect");
+    IoDeleteSymbolicLink(&symLink);
+    IoDeleteDevice(DriverObject->DeviceObject);
+}
+
+NTSTATUS DelProtect2CreateClose(PDEVICE_OBJECT, PIRP Irp) 
+{
+    Irp->IoStatus.Status = STATUS_SUCCESS;
+    Irp->IoStatus.Information = 0;
+    IoCompleteRequest(Irp, IO_NO_INCREMENT);
+    return STATUS_SUCCESS;
+}
+
+NTSTATUS DelProtect2DeviceControl(PDEVICE_OBJECT, PIRP Irp)
+{
+    auto status = STATUS_SUCCESS;
+    auto stack = IoGetCurrentIrpStackLocation(Irp);
+    switch (stack->Parameters.DeviceIoControl.IoControlCode)
+    {
+    case IOCTL_DELPROTECT_ADD_EXE:
+        {
+            auto name = (WCHAR*)Irp->AssociatedIrp.SystemBuffer;
+            if (!name)
+            {
+                status = STATUS_INVALID_PARAMETER;
+                break;
+            }
+
+            if (FindExecutable(name))
+            {
+                break;
+            }
+
+            AutoLock locker(ExeNamesLock);
+            if (ExeNamesCount == MaxExecutables)
+            {
+                status = STATUS_TOO_MANY_NAMES;
+                break;
+            }
+
+            for (int i = 0; i < MaxExecutables; i++)
+            {
+                if (ExeNames[i] == nullptr)
+                {
+                    auto len = (::wcslen(name) + 1) * sizeof(WCHAR);
+                    auto buffer = (WCHAR*)ExAllocatePoolWithTag(PagedPool, len, DRIVER_TAG);
+                    if (!buffer)
+                    {
+                        status = STATUS_INSUFFICIENT_RESOURCES;
+                        break;
+                    }
+                    ::wcscpy_s(buffer, len / sizeof(WCHAR), name);
+                    ExeNames[i] = buffer;
+                    ++ExeNamesCount;
+                    break;
+                }
+            }
+        }
+        break;
+
+    case IOCTL_DELPROTECT_REMOVE_EXE:
+        {
+            auto name = (WCHAR*)Irp->AssociatedIrp.SystemBuffer;
+            if (!name)
+            {
+                status = STATUS_INVALID_PARAMETER;
+                break;
+            }
+            AutoLock locker(ExeNamesLock);
+            auto found = false;
+            for (int i = 0; i < MaxExecutables; i++)
+            {
+                if (::_wcsicmp(ExeNames[i], name) == 0)
+                {
+                    ExFreePool(ExeNames[i]);
+                    ExeNames[i] = nullptr;
+                    --ExeNamesCount;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found)
+            {
+                status = STATUS_NOT_FOUND;
+            }
+        }
+        break;
+
+    case IOCTL_DELPROTECT_CLEAR:
+        ClearAll();
+        break;
+        break;
+
+    default:
+        status = STATUS_INVALID_DEVICE_REQUEST;
+        break;
+    }
+
+    Irp->IoStatus.Status = status;
+    Irp->IoStatus.Information = 0;
+    IoCompleteRequest(Irp, IO_NO_INCREMENT);
+    return status;
 }
 
 bool FindExecutable(PCWSTR name)

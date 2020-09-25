@@ -11,10 +11,10 @@
 #define KEDBG_TRACE_OPERATION_STATUS    0x00000002
 #define KEDBG_TRACE_DEBUG               0x00000004
 #define KEDBG_TRACE_ERROR               0x00000008
-#define KEDBG_TRACE_ALL (KEDBG_TRACE_ROUTINES|KEDBG_TRACE_OPERATION_STATUS|KEDBG_TRACE_DEBUG|KEDBG_TRACE_ERROR)
+constexpr ULONG KEDBG_TRACE_FLAGS = KEDBG_TRACE_ROUTINES | KEDBG_TRACE_OPERATION_STATUS | KEDBG_TRACE_DEBUG | KEDBG_TRACE_ERROR;
 
 #define KE_DBG_PRINT( _dbgLevel, _string )          \
-    if(FlagOn(KEDBG_TRACE_ALL,(_dbgLevel))) {    \
+    if(FlagOn(KEDBG_TRACE_FLAGS,(_dbgLevel))) {    \
         DbgPrint _string;                           \
     }
 
