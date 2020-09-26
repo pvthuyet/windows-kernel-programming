@@ -22,13 +22,13 @@ public:
 	wchar_t& operator[](size_t index);
 
 	const wchar_t* Get() const;
-	ULONG Length() const;
+	size_t Length() const;
 
 	kstring ToLower() const;
 	kstring& ToLower();
 
 	kstring& Truncate(ULONG length);
-	kstring& Append(PCWSTR str, ULONG len = 0);
+	kstring& Append(PCWSTR str, size_t len = 0);
 
 	const wchar_t GetAt(size_t index) const;
 	wchar_t& GetAt(size_t index);
@@ -41,8 +41,8 @@ private:
 
 private:
 	wchar_t* m_str;
-	ULONG m_Len;
-	ULONG m_Capacity;
+	size_t m_Len;
+	size_t m_Capacity;
 	POOL_TYPE m_Pool;
 	ULONG m_Tag;
 };

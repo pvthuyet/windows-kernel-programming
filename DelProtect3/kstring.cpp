@@ -164,7 +164,7 @@ const wchar_t* kstring::Get() const
 	return this->m_str;
 }
 
-ULONG kstring::Length() const
+size_t kstring::Length() const
 {
 	return this->m_Len;
 }
@@ -192,18 +192,14 @@ kstring& kstring::Truncate(ULONG length)
 	return *this;
 }
 
-kstring& kstring::Append(PCWSTR str, ULONG len)
+kstring& kstring::Append(PCWSTR str, size_t len)
 {
 	if (!str)
 	{
 		return *this;
 	}
 
-	if (0 == len)
-	{
-		len = static_cast<ULONG>(wcslen(str));
-	}
-
+	len = (0 == len) ? wcslen(str) : len;
 	if (len > 0)
 	{
 		auto newAlloc = false;

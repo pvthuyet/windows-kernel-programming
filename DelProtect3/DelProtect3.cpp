@@ -917,7 +917,7 @@ NTSTATUS ConvertDosNameToNtName(_In_ PCWSTR dosName, _Out_ PUNICODE_STRING ntNam
     }
 
     ntName->Buffer = nullptr;
-    auto dosNameLen = ::wcslen(dosName);
+    auto dosNameLen = ::wcsnlen_s(dosName, MAX_UNICODE_STACK_BUFFER_LENGTH);
     if (dosNameLen < 3)
     {
         return STATUS_BUFFER_TOO_SMALL;
@@ -930,11 +930,79 @@ NTSTATUS ConvertDosNameToNtName(_In_ PCWSTR dosName, _Out_ PUNICODE_STRING ntNam
     }
 
     kstring symLink(L"\\??\\", PagedPool, DRIVER_TAG);
-    symLink.Append(dosName, 2); // driver letter and colon
+    symLink.Append(dosName + 2, dosNameLen - 2); // driver letter and colon
 
     // prepare to open symbolic link
     UNICODE_STRING symLinkFull{ 0 };
-    symLink.GetUnicodeString(&symLinkFull); //++ TODO
+    symLink.GetUnicodeString(&symLinkFull);
+    OBJECT_ATTRIBUTES symLinkAttr{ 0 };
+    InitializeObjectAttributes(&symLinkAttr, &symLinkFull, OBJ_KERNEL_HANDLE | OBJ_CASE_INSENSITIVE, nullptr, nullptr);
+    
+    HANDLE hSymLink = nullptr;
+    auto status = STATUS_SUCCESS;
+    do
+    {
+        // open symbolic link
+        status = ZwOpenSymbolicLinkObject(&hSymLink, GENERIC_READ, &symLinkAttr);
+        if (!NT_SUCCESS(status))
+        {
+            break;
+        }
 
-    return STATUS_SUCCESS;
+        USHORT maxLen = 1024;
+        ntName->Buffer = (wchar_t*)ExAllocatePoolWithTag(PagedPool, maxLen, DRIVER_TAG);
+        if (!ntName->Buffer)
+        {
+            status = STATUS_INSUFFICIENT_RESOURCES;
+            break;
+        }
+        ntName->MaximumLength = maxLen;
+
+        // read target of symbolic link
+        status = ZwQuerySymbolicLinkObject(hSymLink, ntName, nullptr);
+        if (!NT_SUCCESS(status))
+        {
+            break;
+        }
+
+    } while (false);
+
+    if (!NT_SUCCESS(status))
+    {
+        if (ntName->Buffer)
+        {
+            ExFreePool(ntName->Buffer);
+            ntName->Buffer = nullptr;
+            ntName->Length = ntName->MaximumLength = 0;
+        }
+    }
+    else
+    {
+        RtlAppendUnicodeToString(ntName, dosName + 2);	// directory
+    }
+    if (hSymLink)
+    {
+        ZwClose(hSymLink);
+    }
+
+    return status;
+}
+
+int FindDirectory(_In_ PCUNICODE_STRING name, bool dosName)
+{
+    if (0 == DirNamesCount)
+    {
+        return -1;
+    }
+
+    for (int i = 0; i < MaxDirectories; i++)
+    {
+        const auto& dir = dosName ? DirNames[i].DosName : DirNames[i].NtName;
+        if (dir.Buffer && RtlEqualUnicodeString(name, &dir, TRUE))
+        {
+            return i;
+        }
+    }
+
+    return -1;
 }
