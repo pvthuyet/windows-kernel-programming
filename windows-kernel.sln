@@ -27,6 +27,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DelProtect2Config", "DelPro
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DelProtect3", "DelProtect3\DelProtect3.vcxproj", "{25FB2942-975F-4349-A9F2-40AF73363D11}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DelProtect3Config", "DelProtect3Config\DelProtect3Config.vcxproj", "{497105BD-4302-4A23-9EF5-DBA658E5A5F2}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM = Debug|ARM
@@ -267,6 +269,18 @@ Global
 		{25FB2942-975F-4349-A9F2-40AF73363D11}.Release|x86.ActiveCfg = Release|Win32
 		{25FB2942-975F-4349-A9F2-40AF73363D11}.Release|x86.Build.0 = Release|Win32
 		{25FB2942-975F-4349-A9F2-40AF73363D11}.Release|x86.Deploy.0 = Release|Win32
+		{497105BD-4302-4A23-9EF5-DBA658E5A5F2}.Debug|ARM.ActiveCfg = Debug|Win32
+		{497105BD-4302-4A23-9EF5-DBA658E5A5F2}.Debug|ARM64.ActiveCfg = Debug|Win32
+		{497105BD-4302-4A23-9EF5-DBA658E5A5F2}.Debug|x64.ActiveCfg = Debug|x64
+		{497105BD-4302-4A23-9EF5-DBA658E5A5F2}.Debug|x64.Build.0 = Debug|x64
+		{497105BD-4302-4A23-9EF5-DBA658E5A5F2}.Debug|x86.ActiveCfg = Debug|Win32
+		{497105BD-4302-4A23-9EF5-DBA658E5A5F2}.Debug|x86.Build.0 = Debug|Win32
+		{497105BD-4302-4A23-9EF5-DBA658E5A5F2}.Release|ARM.ActiveCfg = Release|Win32
+		{497105BD-4302-4A23-9EF5-DBA658E5A5F2}.Release|ARM64.ActiveCfg = Release|Win32
+		{497105BD-4302-4A23-9EF5-DBA658E5A5F2}.Release|x64.ActiveCfg = Release|x64
+		{497105BD-4302-4A23-9EF5-DBA658E5A5F2}.Release|x64.Build.0 = Release|x64
+		{497105BD-4302-4A23-9EF5-DBA658E5A5F2}.Release|x86.ActiveCfg = Release|Win32
+		{497105BD-4302-4A23-9EF5-DBA658E5A5F2}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

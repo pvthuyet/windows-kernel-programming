@@ -21,6 +21,7 @@ Environment:
 #include "..\include\FastMutex.h"
 #include "..\include\AutoLock.h"
 #include "kstring.h"
+#include "..\include\ke_logger.h"
 
 extern "C" NTSTATUS ZwQueryInformationProcess(
     _In_      HANDLE           ProcessHandle,
@@ -1042,6 +1043,7 @@ NTSTATUS DelProtect3CreateClose(PDEVICE_OBJECT, PIRP Irp)
 
 NTSTATUS DelProtect3DeviceControl(PDEVICE_OBJECT, PIRP Irp)
 {
+    LOGENTER;
     auto status = STATUS_SUCCESS;
     auto stack = IoGetCurrentIrpStackLocation(Irp);
     switch (stack->Parameters.DeviceIoControl.IoControlCode)
@@ -1051,6 +1053,7 @@ NTSTATUS DelProtect3DeviceControl(PDEVICE_OBJECT, PIRP Irp)
             auto name = (WCHAR*)Irp->AssociatedIrp.SystemBuffer;
             if (!name) {
                 status = STATUS_INVALID_PARAMETER;
+                KdPrint((DRIVER_PREFIX "STATUS_INVALID_PARAMETER %d\n", __LINE__));
                 break;
             }
 
@@ -1058,6 +1061,7 @@ NTSTATUS DelProtect3DeviceControl(PDEVICE_OBJECT, PIRP Irp)
             if (bufferLen > 1024) {
                 // just too long for a directory
                 status = STATUS_INVALID_PARAMETER;
+                KdPrint((DRIVER_PREFIX "STATUS_INVALID_PARAMETER %d\n", __LINE__));
                 break;
             }
 
@@ -1067,6 +1071,7 @@ NTSTATUS DelProtect3DeviceControl(PDEVICE_OBJECT, PIRP Irp)
             auto dosNameLen = ::wcsnlen_s(name, maxStrLen);
             if (dosNameLen < 3) {
                 status = STATUS_BUFFER_TOO_SMALL;
+                KdPrint((DRIVER_PREFIX "STATUS_BUFFER_TOO_SMALL %d\n", __LINE__));
                 break;
             }
 
@@ -1074,11 +1079,13 @@ NTSTATUS DelProtect3DeviceControl(PDEVICE_OBJECT, PIRP Irp)
             UNICODE_STRING strName;
             RtlInitUnicodeString(&strName, name);
             if (FindDirectory(&strName, true) >= 0) {
+                KdPrint((DRIVER_PREFIX "The directory already existed %d\n", __LINE__));
                 break;
             }
 
             if (DirNamesCount == MaxDirectories) {
                 status = STATUS_TOO_MANY_NAMES;
+                KdPrint((DRIVER_PREFIX "STATUS_TOO_MANY_NAMES %d\n", __LINE__));
                 break;
             }
 
@@ -1090,6 +1097,7 @@ NTSTATUS DelProtect3DeviceControl(PDEVICE_OBJECT, PIRP Irp)
                     auto buffer = (WCHAR*)ExAllocatePoolWithTag(PagedPool, len, DRIVER_TAG);
                     if (!buffer) {
                         status = STATUS_INSUFFICIENT_RESOURCES;
+                        KdPrint((DRIVER_PREFIX "STATUS_INSUFFICIENT_RESOURCES %d\n", __LINE__));
                         break;
                     }
                     ::wcscpy_s(buffer, len / sizeof(WCHAR), name);
@@ -1099,14 +1107,16 @@ NTSTATUS DelProtect3DeviceControl(PDEVICE_OBJECT, PIRP Irp)
                         wcscat_s(buffer, dosNameLen + 2, L"\\");
                     }
 
+                    KdPrint((DRIVER_PREFIX "Dos name: %ws\n", buffer));
                     status = ConvertDosNameToNtName(buffer, &DirNames[i].NtName);
                     if (!NT_SUCCESS(status)) {
+                        KdPrint((DRIVER_PREFIX "Failed to ConvertDosNameToNtName (0x%08X):%d\n", status, __LINE__));
                         ExFreePoolWithTag(buffer, DRIVER_TAG);
                         break;
                     }
 
                     RtlInitUnicodeString(&DirNames[i].DosName, buffer);
-                    KdPrint(("Add: %wZ <=> %wZ\n", &DirNames[i].DosName, &DirNames[i].NtName));
+                    KdPrint(("Add: dos name: %wZ <=> nt name: %wZ\n", &DirNames[i].DosName, &DirNames[i].NtName));
                     ++DirNamesCount;
                     break;
                 }
@@ -1167,6 +1177,7 @@ NTSTATUS DelProtect3DeviceControl(PDEVICE_OBJECT, PIRP Irp)
     Irp->IoStatus.Status = status;
     Irp->IoStatus.Information = 0;
     IoCompleteRequest(Irp, IO_NO_INCREMENT);
+    LOGEXIT;
     return status;
 }
 
@@ -1191,11 +1202,12 @@ NTSTATUS ConvertDosNameToNtName(_In_ PCWSTR dosName, _Out_ PUNICODE_STRING ntNam
     }
 
     kstring symLink(L"\\??\\", PagedPool, DRIVER_TAG);
-    symLink.Append(dosName + 2, dosNameLen - 2); // driver letter and colon
+    symLink.Append(dosName, 2); // driver letter and colon
 
     // prepare to open symbolic link
     UNICODE_STRING symLinkFull{ 0 };
     symLink.GetUnicodeString(&symLinkFull);
+    KdPrint(("symLinkFull %wZ\n", &symLinkFull));
     OBJECT_ATTRIBUTES symLinkAttr{ 0 };
     InitializeObjectAttributes(&symLinkAttr, &symLinkFull, OBJ_KERNEL_HANDLE | OBJ_CASE_INSENSITIVE, nullptr, nullptr);
     
@@ -1207,6 +1219,7 @@ NTSTATUS ConvertDosNameToNtName(_In_ PCWSTR dosName, _Out_ PUNICODE_STRING ntNam
         status = ZwOpenSymbolicLinkObject(&hSymLink, GENERIC_READ, &symLinkAttr);
         if (!NT_SUCCESS(status))
         {
+            KdPrint(("Failed ZwOpenSymbolicLinkObject %d\n", __LINE__));
             break;
         }
 
@@ -1214,6 +1227,7 @@ NTSTATUS ConvertDosNameToNtName(_In_ PCWSTR dosName, _Out_ PUNICODE_STRING ntNam
         ntName->Buffer = (wchar_t*)ExAllocatePoolWithTag(PagedPool, maxLen, DRIVER_TAG);
         if (!ntName->Buffer)
         {
+            KdPrint(("Failed ExAllocatePoolWithTag %d\n", __LINE__));
             status = STATUS_INSUFFICIENT_RESOURCES;
             break;
         }
@@ -1223,6 +1237,7 @@ NTSTATUS ConvertDosNameToNtName(_In_ PCWSTR dosName, _Out_ PUNICODE_STRING ntNam
         status = ZwQuerySymbolicLinkObject(hSymLink, ntName, nullptr);
         if (!NT_SUCCESS(status))
         {
+            KdPrint(("Failed ZwQuerySymbolicLinkObject %d\n", __LINE__));
             break;
         }
 
