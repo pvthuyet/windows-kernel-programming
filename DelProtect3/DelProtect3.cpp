@@ -17,6 +17,7 @@ Environment:
 #include <fltKernel.h>
 #include <dontuse.h>
 #include "DelProtect3.h"
+#include "DelProtect3Common.h"
 #include "..\include\FastMutex.h"
 #include "..\include\AutoLock.h"
 #include "kstring.h"
@@ -57,9 +58,26 @@ ULONG gTraceFlags = 0;
 int FindDirectory(_In_ PCUNICODE_STRING name, bool dosName);
 NTSTATUS ConvertDosNameToNtName(_In_ PCWSTR dosName, _Out_ PUNICODE_STRING ntName);
 bool IsDeleteAllowed(_In_ PFLT_CALLBACK_DATA Data);
-
+void ClearAll();
 
 EXTERN_C_START
+
+DRIVER_DISPATCH DelProtect3CreateClose, DelProtect3DeviceControl;
+DRIVER_UNLOAD DelProtect3UnloadDriver;
+
+FLT_PREOP_CALLBACK_STATUS
+DelProtect3PreCreate(
+    _Inout_ PFLT_CALLBACK_DATA Data,
+    _In_ PCFLT_RELATED_OBJECTS FltObjects,
+    _Flt_CompletionContext_Outptr_ PVOID* CompletionContext
+);
+
+FLT_PREOP_CALLBACK_STATUS
+DelProtect3PreSetInformation(
+    _Inout_ PFLT_CALLBACK_DATA Data,
+    _In_ PCFLT_RELATED_OBJECTS FltObjects,
+    _Flt_CompletionContext_Outptr_ PVOID* CompletionContext
+);
 
 DRIVER_INITIALIZE DriverEntry;
 NTSTATUS
@@ -154,6 +172,9 @@ EXTERN_C_END
 //
 
 CONST FLT_OPERATION_REGISTRATION Callbacks[] = {
+
+    { IRP_MJ_CREATE, 0, DelProtect3PreCreate, nullptr },
+    { IRP_MJ_SET_INFORMATION, 0, DelProtect3PreSetInformation, nullptr },
 
 #if 0 // TODO - List all of the requests to filter.
     { IRP_MJ_CREATE,
@@ -576,27 +597,61 @@ Return Value:
     PT_DBG_PRINT( PTDBG_TRACE_ROUTINES,
                   ("DelProtect3!DriverEntry: Entered\n") );
 
-    //
-    //  Register with FltMgr to tell it our callback routines
-    //
+    // create a standard device object and symbolic link
+    PDEVICE_OBJECT DeviceObject = nullptr;
+    UNICODE_STRING devName = RTL_CONSTANT_STRING(DEVICE_NAME);
+    UNICODE_STRING symLink = RTL_CONSTANT_STRING(SYM_LINK_NAME);
+    auto symLinkCreated = false;
+    do
+    {
+        status = IoCreateDevice(DriverObject, 0, &devName, FILE_DEVICE_UNKNOWN, 0, FALSE, &DeviceObject);
+        if (!NT_SUCCESS(status)) {
+            break;
+        }
 
-    status = FltRegisterFilter( DriverObject,
-                                &FilterRegistration,
-                                &gFilterHandle );
+        status = IoCreateSymbolicLink(&symLink, &devName);
+        if (!NT_SUCCESS(status)) {
+            break;
+        }
+        symLinkCreated = true;
 
-    FLT_ASSERT( NT_SUCCESS( status ) );
+        //
+        //  Register with FltMgr to tell it our callback routines
+        //
 
-    if (NT_SUCCESS( status )) {
+        status = FltRegisterFilter(DriverObject,
+            &FilterRegistration,
+            &gFilterHandle);
+        FLT_ASSERT(NT_SUCCESS(status));
+        if (!NT_SUCCESS(status)) {
+            break;
+        }
+
+        DriverObject->DriverUnload = DelProtect3UnloadDriver;
+        DriverObject->MajorFunction[IRP_MJ_CREATE] = DriverObject->MajorFunction[IRP_MJ_CLOSE] = DelProtect3CreateClose;
+        DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = DelProtect3DeviceControl;
+        DirNamesLock.init();
 
         //
         //  Start filtering i/o
         //
 
-        status = FltStartFiltering( gFilterHandle );
+        status = FltStartFiltering(gFilterHandle);
 
-        if (!NT_SUCCESS( status )) {
+    } while(false);
 
-            FltUnregisterFilter( gFilterHandle );
+    if (!NT_SUCCESS(status))
+    {
+        if (gFilterHandle) {
+            FltUnregisterFilter(gFilterHandle);
+        }
+
+        if (symLinkCreated) {
+            IoDeleteSymbolicLink(&symLink);
+        }
+
+        if (DeviceObject) {
+            IoDeleteDevice(DeviceObject);
         }
     }
 
@@ -909,6 +964,212 @@ Return Value:
              );
 }
 
+
+FLT_PREOP_CALLBACK_STATUS
+DelProtect3PreCreate(
+    _Inout_ PFLT_CALLBACK_DATA Data,
+    _In_ PCFLT_RELATED_OBJECTS FltObjects,
+    _Flt_CompletionContext_Outptr_ PVOID* CompletionContext
+)
+{
+    UNREFERENCED_PARAMETER(CompletionContext);
+    if (Data->RequestorMode == KernelMode) {
+        return FLT_PREOP_SUCCESS_NO_CALLBACK;
+    }
+
+    auto& params = Data->Iopb->Parameters.Create;
+    if (params.Options & FILE_DELETE_ON_CLOSE)
+    {
+        // delete operation
+        KdPrint(("Delete on close: %wZ\n", &FltObjects->FileObject->FileName));
+        if (!IsDeleteAllowed(Data)) {
+            Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+            return FLT_PREOP_COMPLETE;
+        }
+    }
+    return FLT_PREOP_SUCCESS_NO_CALLBACK;
+}
+
+FLT_PREOP_CALLBACK_STATUS
+DelProtect3PreSetInformation(
+    _Inout_ PFLT_CALLBACK_DATA Data,
+    _In_ PCFLT_RELATED_OBJECTS FltObjects,
+    _Flt_CompletionContext_Outptr_ PVOID* CompletionContext
+)
+{
+    UNREFERENCED_PARAMETER(FltObjects);
+    UNREFERENCED_PARAMETER(CompletionContext);
+    if (Data->RequestorMode == KernelMode) {
+        return FLT_PREOP_SUCCESS_NO_CALLBACK;
+    }
+
+    auto& params = Data->Iopb->Parameters.SetFileInformation;
+    if (params.FileInformationClass != FileDispositionInformation 
+        && params.FileInformationClass != FileDispositionInformationEx)
+    {
+        // not a delete operation
+        return FLT_PREOP_SUCCESS_NO_CALLBACK;
+    }
+
+    auto info = (FILE_DISPOSITION_INFORMATION*)params.InfoBuffer;
+    if (!info->DeleteFile) {
+        return FLT_PREOP_SUCCESS_NO_CALLBACK;
+    }
+
+    if (IsDeleteAllowed(Data)) {
+        return FLT_PREOP_SUCCESS_NO_CALLBACK;
+    }
+
+    Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+    return FLT_PREOP_COMPLETE;
+}
+
+void DelProtect3UnloadDriver(PDRIVER_OBJECT DriverObject)
+{
+    ClearAll();
+    UNICODE_STRING symLink = RTL_CONSTANT_STRING(SYM_LINK_NAME);
+    IoDeleteSymbolicLink(&symLink);
+    IoDeleteDevice(DriverObject->DeviceObject);
+}
+
+NTSTATUS DelProtect3CreateClose(PDEVICE_OBJECT, PIRP Irp)
+{
+    Irp->IoStatus.Status = STATUS_SUCCESS;
+    Irp->IoStatus.Information = 0;
+    IoCompleteRequest(Irp, IO_NO_INCREMENT);
+    return STATUS_SUCCESS;
+}
+
+NTSTATUS DelProtect3DeviceControl(PDEVICE_OBJECT, PIRP Irp)
+{
+    auto status = STATUS_SUCCESS;
+    auto stack = IoGetCurrentIrpStackLocation(Irp);
+    switch (stack->Parameters.DeviceIoControl.IoControlCode)
+    {
+    case IOCTL_DELPROTECT_ADD_DIR:
+        {
+            auto name = (WCHAR*)Irp->AssociatedIrp.SystemBuffer;
+            if (!name) {
+                status = STATUS_INVALID_PARAMETER;
+                break;
+            }
+
+            auto bufferLen = stack->Parameters.DeviceIoControl.InputBufferLength;
+            if (bufferLen > 1024) {
+                // just too long for a directory
+                status = STATUS_INVALID_PARAMETER;
+                break;
+            }
+
+            // make sure there is a NULL terminator somewhere
+            auto maxStrLen = bufferLen / sizeof(WCHAR);
+            name[maxStrLen - 1] = L'\0';
+            auto dosNameLen = ::wcsnlen_s(name, maxStrLen);
+            if (dosNameLen < 3) {
+                status = STATUS_BUFFER_TOO_SMALL;
+                break;
+            }
+
+            AutoLock locker(DirNamesLock);
+            UNICODE_STRING strName;
+            RtlInitUnicodeString(&strName, name);
+            if (FindDirectory(&strName, true) >= 0) {
+                break;
+            }
+
+            if (DirNamesCount == MaxDirectories) {
+                status = STATUS_TOO_MANY_NAMES;
+                break;
+            }
+
+            for (int i = 0; i < MaxDirectories; i++) 
+            {
+                if (DirNames[i].DosName.Buffer == nullptr)
+                {
+                    auto len = (dosNameLen + 2) * sizeof(WCHAR);
+                    auto buffer = (WCHAR*)ExAllocatePoolWithTag(PagedPool, len, DRIVER_TAG);
+                    if (!buffer) {
+                        status = STATUS_INSUFFICIENT_RESOURCES;
+                        break;
+                    }
+                    ::wcscpy_s(buffer, len / sizeof(WCHAR), name);
+                    
+                    // append a backslash if it's missing
+                    if (name[dosNameLen - 1] != L'\\') {
+                        wcscat_s(buffer, dosNameLen + 2, L"\\");
+                    }
+
+                    status = ConvertDosNameToNtName(buffer, &DirNames[i].NtName);
+                    if (!NT_SUCCESS(status)) {
+                        ExFreePoolWithTag(buffer, DRIVER_TAG);
+                        break;
+                    }
+
+                    RtlInitUnicodeString(&DirNames[i].DosName, buffer);
+                    KdPrint(("Add: %wZ <=> %wZ\n", &DirNames[i].DosName, &DirNames[i].NtName));
+                    ++DirNamesCount;
+                    break;
+                }
+            }
+        }
+        break;
+
+    case IOCTL_DELPROTECT_REMOVE_DIR:
+        {
+            auto name = (WCHAR*)Irp->AssociatedIrp.SystemBuffer;
+            if (!name) {
+                status = STATUS_INVALID_PARAMETER;
+                break;
+            }
+
+            auto bufferLen = stack->Parameters.DeviceIoControl.InputBufferLength;
+            if (bufferLen > 1024) {
+                // just too long for a directory
+                status = STATUS_INVALID_PARAMETER;
+                break;
+            }
+
+            auto maxStrLen = bufferLen / sizeof(WCHAR);
+            // make sure there is a NULL terminator somewhere
+            name[maxStrLen - 1] = L'\0';
+
+            auto dosNameLen = ::wcsnlen_s(name, maxStrLen);
+            if (dosNameLen < 3) {
+                status = STATUS_BUFFER_TOO_SMALL;
+                break;
+            }
+
+            AutoLock locker(DirNamesLock);
+            UNICODE_STRING strName;
+            RtlInitUnicodeString(&strName, name);
+            int found = FindDirectory(&strName, true);
+            if (found >= 0) 
+            {
+                DirNames[found].Free();
+                DirNamesCount--;
+            }
+            else
+            {
+                status = STATUS_NOT_FOUND;
+            }
+        }
+        break;
+
+    case IOCTL_DELPROTECT_CLEAR:
+        ClearAll();
+        break;
+
+    default:
+        status = STATUS_INVALID_DEVICE_REQUEST;
+        break;
+    }
+
+    Irp->IoStatus.Status = status;
+    Irp->IoStatus.Information = 0;
+    IoCompleteRequest(Irp, IO_NO_INCREMENT);
+    return status;
+}
+
 NTSTATUS ConvertDosNameToNtName(_In_ PCWSTR dosName, _Out_ PUNICODE_STRING ntName)
 {
     if (!dosName)
@@ -1005,4 +1266,53 @@ int FindDirectory(_In_ PCUNICODE_STRING name, bool dosName)
     }
 
     return -1;
+}
+
+bool IsDeleteAllowed(_In_ PFLT_CALLBACK_DATA Data)
+{
+    PFLT_FILE_NAME_INFORMATION nameInfo = nullptr;
+    auto allow = true;
+    do
+    {
+        auto status = FltGetFileNameInformation(Data, FLT_FILE_NAME_QUERY_DEFAULT | FLT_FILE_NAME_NORMALIZED, &nameInfo);
+        if (!NT_SUCCESS(status)) {
+            break;
+        }
+
+        status = FltParseFileNameInformation(nameInfo);
+        if (!NT_SUCCESS(status)) {
+            break;
+        }
+
+        // concatenate volume+share+directory
+        UNICODE_STRING path;
+        path.Length = path.MaximumLength = nameInfo->Volume.Length + nameInfo->Share.Length + nameInfo->ParentDir.Length;
+        path.Buffer = nameInfo->Volume.Buffer;
+        KdPrint(("Checking directory: %wZ\n", &path));
+
+        AutoLock locker(DirNamesLock);
+        if (FindDirectory(&path, false) >= 0)
+        {
+            allow = false;
+            KdPrint(("File not allowed to delete: %wZ\n", &nameInfo->Name));
+        }
+
+    } while (false);
+
+    if (nameInfo)
+    {
+        FltReleaseFileNameInformation(nameInfo);
+    }
+
+    return allow;
+}
+
+void ClearAll()
+{
+    AutoLock locker(DirNamesLock);
+    for (int i = 0; i < MaxDirectories; i++)
+    {
+        DirNames[i].Free();
+    }
+    DirNamesCount = 0;
 }

@@ -35,12 +35,21 @@
     <ClCompile Include="kstring.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\include\FastMutex.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DelProtect3.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\kstring.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\FastMutex.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="DelProtect3Common.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

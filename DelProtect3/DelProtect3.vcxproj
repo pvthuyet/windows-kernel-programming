@@ -35,6 +35,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\include\FastMutex.cpp" />
     <ClCompile Include="kstring.cpp" />
     <ResourceCompile Include="DelProtect3.rc" />
     <ClCompile Include="DelProtect3.cpp" />
@@ -214,8 +215,10 @@
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\include\FastMutex.h" />
     <ClInclude Include="..\include\kstring.h" />
     <ClInclude Include="DelProtect3.h" />
+    <ClInclude Include="DelProtect3Common.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

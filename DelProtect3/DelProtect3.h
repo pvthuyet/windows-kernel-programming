@@ -11,12 +11,12 @@ struct DirectoryEntry
 	void Free() 
 	{
 		if (DosName.Buffer) {
-			ExFreePool(DosName.Buffer);
+			ExFreePoolWithTag(DosName.Buffer, DRIVER_TAG);
 			DosName.Buffer = nullptr;
 		}
 
 		if (NtName.Buffer) {
-			ExFreePool(NtName.Buffer);
+			ExFreePoolWithTag(NtName.Buffer, DRIVER_TAG);
 			NtName.Buffer = nullptr;
 		}
 	}
