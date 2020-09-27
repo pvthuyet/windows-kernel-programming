@@ -36,7 +36,7 @@ ULONG_PTR OperationStatusCtx = 1;
 #define PTDBG_TRACE_ROUTINES            0x00000001
 #define PTDBG_TRACE_OPERATION_STATUS    0x00000002
 
-ULONG gTraceFlags = 0;
+ULONG gTraceFlags = PTDBG_TRACE_ROUTINES | PTDBG_TRACE_OPERATION_STATUS;
 
 
 #define PT_DBG_PRINT( _dbgLevel, _string )          \
@@ -949,6 +949,9 @@ DelProtectPreCreate(
         // Delete operation
         PT_DBG_PRINT(PTDBG_TRACE_ROUTINES,
             ("DelProtect!DelProtectPreCreate: Delete on close: %wZ\n", &Data->Iopb->TargetFileObject->FileName));
+
+        PT_DBG_PRINT(PTDBG_TRACE_ROUTINES,
+            ("call from DelProtectPreCreate\n"));
         if (!IsDeleteAllowed(PsGetCurrentProcess()))
         {
             Data->IoStatus.Status = STATUS_ACCESS_DENIED;
@@ -991,6 +994,8 @@ DelProtectPreSetInformation(
     auto process = PsGetThreadProcess(Data->Thread);
     FLT_ASSERT(process);
 
+    PT_DBG_PRINT(PTDBG_TRACE_ROUTINES,
+        ("call from DelProtectPreSetInformation\n"));
     if (!IsDeleteAllowed(process))
     {
         Data->IoStatus.Status = STATUS_ACCESS_DENIED;
@@ -1022,7 +1027,7 @@ bool IsDeleteAllowed(const PEPROCESS Process)
 
     auto size = 300;
     bool allowDelete = true;
-    auto processName = (UNICODE_STRING*)ExAllocatePool(PagedPool, size);
+    auto processName = (UNICODE_STRING*)ExAllocatePoolWithTag(PagedPool, size, DRIVER_TAG);
     if (processName)
     {
         RtlZeroMemory(processName, size);
