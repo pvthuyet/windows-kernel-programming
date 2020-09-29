@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "FileBackupHelper.h"
 #include "define.h"
+#include "ke_logger.h"
 
 bool IsBackupDirectory(_In_ PCUNICODE_STRING directory)
 {
@@ -28,6 +29,7 @@ bool IsBackupDirectory(_In_ PCUNICODE_STRING directory)
 
 NTSTATUS BackupFile(_In_ PUNICODE_STRING FileName, _In_ PCFLT_RELATED_OBJECTS FltObjects) 
 {
+	LOGENTER;
 	HANDLE hTargetFile = nullptr;
 	HANDLE hSourceFile = nullptr;
 	IO_STATUS_BLOCK ioStatus;
@@ -159,5 +161,6 @@ NTSTATUS BackupFile(_In_ PUNICODE_STRING FileName, _In_ PCFLT_RELATED_OBJECTS Fl
 	if (hTargetFile)
 		FltClose(hTargetFile);
 
+	LOGEXIT;
 	return status;
 }

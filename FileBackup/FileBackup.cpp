@@ -21,6 +21,7 @@ Environment:
 #include "define.h"
 #include "FileBackupCommon.h"
 #include "ke_filename_info.h"
+#include "ke_logger.h"
 
 #pragma prefast(disable:__WARNING_ENCODE_MEMBER_FUNCTION_POINTER, "Not valid for kernel mode drivers")
 
@@ -453,6 +454,7 @@ Return Value:
 
 --*/
 {
+    LOGENTER;
     UNREFERENCED_PARAMETER( FltObjects );
     UNREFERENCED_PARAMETER( Flags );
     UNREFERENCED_PARAMETER( VolumeDeviceType );
@@ -465,9 +467,11 @@ Return Value:
 
     if (FLT_FSTYPE_NTFS != VolumeFilesystemType)
     {
-        KdPrint((DRIVER_NAME "Not attaching to non-NTFS volume\n"));
+        KdPrint((DRIVER_PREFIX "Not attaching to non-NTFS volume\n"));
         return STATUS_FLT_DO_NOT_ATTACH;
     }
+
+    LOGEXIT;
     return STATUS_SUCCESS;
 }
 
@@ -612,6 +616,7 @@ Return Value:
 
 --*/
 {
+    LOGENTER;
     NTSTATUS status;
 
     UNREFERENCED_PARAMETER( RegistryPath );
@@ -664,6 +669,7 @@ Return Value:
         }
     }
 
+    LOGEXIT;
     return status;
 }
 
@@ -690,6 +696,7 @@ Return Value:
 
 --*/
 {
+    LOGENTER;
     UNREFERENCED_PARAMETER( Flags );
 
     PAGED_CODE();
@@ -700,6 +707,7 @@ Return Value:
     FltCloseCommunicationPort(FilterPort);
     FltUnregisterFilter( gFilterHandle );
 
+    LOGEXIT;
     return STATUS_SUCCESS;
 }
 
@@ -982,6 +990,7 @@ FileBackupPostCreate(
     _In_ FLT_POST_OPERATION_FLAGS Flags
 )
 {
+    //LOGENTER;
     UNREFERENCED_PARAMETER(FltObjects);
     UNREFERENCED_PARAMETER(CompletionContext);
     
@@ -995,51 +1004,60 @@ FileBackupPostCreate(
         || FILE_DOES_NOT_EXIST == Data->IoStatus.Information)
     {
         // kernel caller, not write access or a new file - skip
+        KdPrint((DRIVER_PREFIX "not write access or a new file\n"));
         return FLT_POSTOP_FINISHED_PROCESSING;
     }
 
     fibo::kernel::FilterFileNameInfo fileNameInfo(Data);
     if (!fileNameInfo) {
+        KdPrint((DRIVER_PREFIX "Failed to query file name information\n"));
         return FLT_POSTOP_FINISHED_PROCESSING;
     }
 
     if (!NT_SUCCESS(fileNameInfo.parse())) {
+        KdPrint((DRIVER_PREFIX "Failed to parse file name information\n"));
         return FLT_POSTOP_FINISHED_PROCESSING;
     }
 
     if (!IsBackupDirectory(&fileNameInfo->ParentDir)) {
+        KdPrint((DRIVER_PREFIX "Not from backup directory\n"));
         return FLT_POSTOP_FINISHED_PROCESSING;
     }
 
     // if it's not the default stream, we don't care
     if (fileNameInfo->Stream.Length > 0) {
+        KdPrint((DRIVER_PREFIX "not the default stream\n"));
         return FLT_POSTOP_FINISHED_PROCESSING;
     }
 
     // allocate and initialize a file context
+    KdPrint((DRIVER_PREFIX "Allocate context\n"));
     FileContext* context = nullptr;
     auto status = FltAllocateContext(FltObjects->Filter, FLT_FILE_CONTEXT, sizeof(FileContext), PagedPool, (PFLT_CONTEXT*)&context);
     if (!NT_SUCCESS(status)) {
-        KdPrint(("Failed to allocate file context (0x%08X)\n", status));
+        KdPrint((DRIVER_PREFIX "Failed to allocate file context (0x%08X)\n", status));
         return FLT_POSTOP_FINISHED_PROCESSING;
     }
 
     context->Written = FALSE;
     context->FileName.MaximumLength = fileNameInfo->Name.Length;
     context->FileName.Buffer = (WCHAR*)ExAllocatePoolWithTag(PagedPool, fileNameInfo->Name.Length, DRIVER_TAG);
-    if (!context->FileName.Buffer) {
+    if (!context->FileName.Buffer) 
+    {
         FltReleaseContext(context);
         return FLT_POSTOP_FINISHED_PROCESSING;
     }
     RtlCopyUnicodeString(&context->FileName, &fileNameInfo->Name);
     context->Lock.init();
     status = FltSetFileContext(FltObjects->Instance, FltObjects->FileObject, FLT_SET_CONTEXT_KEEP_IF_EXISTS, context, nullptr);
-    if (!NT_SUCCESS(status)) {
-        KdPrint(("Failed to set file context (0x%08X)\n", status));
+    if (!NT_SUCCESS(status)) 
+    {
+        KdPrint((DRIVER_PREFIX "Failed to set file context (0x%08X)\n", status));
         ExFreePool(context->FileName.Buffer);
     }
     FltReleaseContext(context);
 
+    LOGEXIT;
     return FLT_POSTOP_FINISHED_PROCESSING;
 }
 
@@ -1050,6 +1068,7 @@ FileBackupPreWrite(
     _Flt_CompletionContext_Outptr_ PVOID* CompletionContext
 )
 {
+    LOGENTER;
     UNREFERENCED_PARAMETER(Data);
     UNREFERENCED_PARAMETER(FltObjects);
     UNREFERENCED_PARAMETER(CompletionContext);
@@ -1057,19 +1076,23 @@ FileBackupPreWrite(
     // get the file context if exists
     FileContext* context = nullptr;
     auto status = FltGetFileContext(FltObjects->Instance, FltObjects->FileObject, (PFLT_CONTEXT*)&context);
-    if (!NT_SUCCESS(status) || context == nullptr) {
+    if (!NT_SUCCESS(status) || context == nullptr) 
+    {
         // no context, continue normally
+        KdPrint((DRIVER_PREFIX "No context (0x%X)\n", status));
         return FLT_PREOP_SUCCESS_NO_CALLBACK;
     }
 
     {
         // acquire the fast mutex in case of multiple writes
+        KdPrint((DRIVER_PREFIX "Starting backup file written=%d ...\n", context->Written));
         fibo::kernel::LockGuard locker(context->Lock);
         if (!context->Written)
         {
             status = BackupFile(&context->FileName, FltObjects);
-            if (!NT_SUCCESS(status)) {
-                KdPrint((DRIVER_NAME "Failed to backup file! (0x%X)\n", status));
+            if (!NT_SUCCESS(status)) 
+            {
+                KdPrint((DRIVER_PREFIX "Failed to backup file! (0x%X)\n", status));
             }
             else
             {
@@ -1085,8 +1108,11 @@ FileBackupPreWrite(
                         RtlCopyMemory(msg->FileName, context->FileName.Buffer, nameLen);
                         LARGE_INTEGER timeout;
                         timeout.QuadPart = -10000 * 100;	// 100msec
-                        FltSendMessage(gFilterHandle, &SendClientPort, msg, len,
+                        KdPrint((DRIVER_PREFIX "Send message to user %wZ\n", msg->FileName));
+                        status = FltSendMessage(gFilterHandle, &SendClientPort, msg, len,
                             nullptr, nullptr, &timeout);
+
+                        KdPrint((DRIVER_PREFIX "Sent to user status (0x%X)\n", status));
                         ExFreePool(msg);
                     }
                 }
@@ -1096,6 +1122,8 @@ FileBackupPreWrite(
     }
 
     FltReleaseContext(context);
+
+    LOGEXIT;
     return FLT_PREOP_SUCCESS_NO_CALLBACK;
 }
 
@@ -1107,6 +1135,7 @@ FileBackupPostCleanup(
     _In_ FLT_POST_OPERATION_FLAGS Flags
 )
 {
+    //LOGENTER;
     UNREFERENCED_PARAMETER(Data);
     UNREFERENCED_PARAMETER(FltObjects);
     UNREFERENCED_PARAMETER(CompletionContext);
@@ -1126,6 +1155,7 @@ FileBackupPostCleanup(
     FltReleaseContext(context);
     FltDeleteContext(context);
 
+    //LOGEXIT;
     return FLT_POSTOP_FINISHED_PROCESSING;
 }
 
@@ -1146,12 +1176,15 @@ NTSTATUS FLTAPI PortConnectNotify(
     _Outptr_result_maybenull_ PVOID* ConnectionPortCookie
 )
 {
+    LOGENTER;
     UNREFERENCED_PARAMETER(ServerPortCookie);
     UNREFERENCED_PARAMETER(ConnectionContext);
     UNREFERENCED_PARAMETER(SizeOfContext);
     UNREFERENCED_PARAMETER(ConnectionPortCookie);
 
     SendClientPort = ClientPort;
+
+    LOGEXIT;
     return STATUS_SUCCESS;
 }
 
@@ -1160,9 +1193,11 @@ VOID FLTAPI PortDisconnectNotify(
     _In_opt_ PVOID ConnectionCookie
 )
 {
+    LOGENTER;
     UNREFERENCED_PARAMETER(ConnectionCookie);
     FltCloseClientPort(gFilterHandle, &SendClientPort);
     SendClientPort = nullptr;
+    LOGEXIT;
 }
 
 _Use_decl_annotations_
@@ -1175,11 +1210,14 @@ NTSTATUS FLTAPI PortMessageNotify(
     _Out_ PULONG ReturnOutputBufferLength
 )
 {
+    LOGENTER;
     UNREFERENCED_PARAMETER(PortCookie);
     UNREFERENCED_PARAMETER(InputBuffer);
     UNREFERENCED_PARAMETER(InputBufferLength);
     UNREFERENCED_PARAMETER(OutputBuffer);
     UNREFERENCED_PARAMETER(OutputBufferLength);
     UNREFERENCED_PARAMETER(ReturnOutputBufferLength);
+
+    LOGEXIT;
     return STATUS_SUCCESS;
 }

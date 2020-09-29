@@ -33,6 +33,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DelProtectClient", "DelProt
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FileBackup", "FileBackup\FileBackup.vcxproj", "{D2A67051-DBBD-40E7-AE29-0426ACD29F0E}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FileBackupMon", "FileBackupMon\FileBackupMon.vcxproj", "{7940BE42-6C79-4697-98EE-DD6883D1A97F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM = Debug|ARM
@@ -321,6 +323,18 @@ Global
 		{D2A67051-DBBD-40E7-AE29-0426ACD29F0E}.Release|x86.ActiveCfg = Release|Win32
 		{D2A67051-DBBD-40E7-AE29-0426ACD29F0E}.Release|x86.Build.0 = Release|Win32
 		{D2A67051-DBBD-40E7-AE29-0426ACD29F0E}.Release|x86.Deploy.0 = Release|Win32
+		{7940BE42-6C79-4697-98EE-DD6883D1A97F}.Debug|ARM.ActiveCfg = Debug|Win32
+		{7940BE42-6C79-4697-98EE-DD6883D1A97F}.Debug|ARM64.ActiveCfg = Debug|Win32
+		{7940BE42-6C79-4697-98EE-DD6883D1A97F}.Debug|x64.ActiveCfg = Debug|x64
+		{7940BE42-6C79-4697-98EE-DD6883D1A97F}.Debug|x64.Build.0 = Debug|x64
+		{7940BE42-6C79-4697-98EE-DD6883D1A97F}.Debug|x86.ActiveCfg = Debug|Win32
+		{7940BE42-6C79-4697-98EE-DD6883D1A97F}.Debug|x86.Build.0 = Debug|Win32
+		{7940BE42-6C79-4697-98EE-DD6883D1A97F}.Release|ARM.ActiveCfg = Release|Win32
+		{7940BE42-6C79-4697-98EE-DD6883D1A97F}.Release|ARM64.ActiveCfg = Release|Win32
+		{7940BE42-6C79-4697-98EE-DD6883D1A97F}.Release|x64.ActiveCfg = Release|x64
+		{7940BE42-6C79-4697-98EE-DD6883D1A97F}.Release|x64.Build.0 = Release|x64
+		{7940BE42-6C79-4697-98EE-DD6883D1A97F}.Release|x86.ActiveCfg = Release|Win32
+		{7940BE42-6C79-4697-98EE-DD6883D1A97F}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
