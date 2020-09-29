@@ -52,7 +52,7 @@ StartType        = 3                            ;SERVICE_DEMAND_START
 ErrorControl     = 1                            ;SERVICE_ERROR_NORMAL
 ; TODO - Change the Load Order Group value
 ; LoadOrderGroup = "FSFilter Activity Monitor"
-LoadOrderGroup = "_TODO_Change_LoadOrderGroup_appropriately_"
+LoadOrderGroup = "FS Open file backup filters"
 AddReg           = MiniFilter.AddRegistry
 
 ;

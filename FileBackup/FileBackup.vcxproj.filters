@@ -50,6 +50,9 @@
     <ClCompile Include="..\..\fibo-windows-kernel-lib\FiboKernelLib\ke_wstring.cpp">
       <Filter>fibo lib</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\fibo-windows-kernel-lib\FiboKernelLib\ke_filename_info.cpp">
+      <Filter>fibo lib</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="FileBackup.h">
@@ -86,6 +89,9 @@
       <Filter>fibo lib</Filter>
     </ClInclude>
     <ClInclude Include="..\..\fibo-windows-kernel-lib\FiboKernelLib\ke_wstring.h">
+      <Filter>fibo lib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\fibo-windows-kernel-lib\FiboKernelLib\ke_filename_info.h">
       <Filter>fibo lib</Filter>
     </ClInclude>
   </ItemGroup>

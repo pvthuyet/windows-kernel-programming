@@ -20,6 +20,7 @@ Environment:
 #include "FileBackupHelper.h"
 #include "define.h"
 #include "FileBackupCommon.h"
+#include "ke_filename_info.h"
 
 #pragma prefast(disable:__WARNING_ENCODE_MEMBER_FUNCTION_POINTER, "Not valid for kernel mode drivers")
 
@@ -32,7 +33,7 @@ PFLT_PORT SendClientPort = nullptr;
 #define PTDBG_TRACE_ROUTINES            0x00000001
 #define PTDBG_TRACE_OPERATION_STATUS    0x00000002
 
-ULONG gTraceFlags = 0;
+ULONG gTraceFlags = PTDBG_TRACE_ROUTINES | PTDBG_TRACE_OPERATION_STATUS;
 
 
 #define PT_DBG_PRINT( _dbgLevel, _string )          \
@@ -628,8 +629,10 @@ Return Value:
 
     FLT_ASSERT( NT_SUCCESS( status ) );
 
-    if (NT_SUCCESS( status )) {
-        do {
+    if (NT_SUCCESS( status )) 
+    {
+        do 
+        {
             UNICODE_STRING name = RTL_CONSTANT_STRING(FILE_BACKUP_PORT);
             PSECURITY_DESCRIPTOR sd;
 
@@ -694,6 +697,7 @@ Return Value:
     PT_DBG_PRINT( PTDBG_TRACE_ROUTINES,
                   ("FileBackup!FileBackupUnload: Entered\n") );
 
+    FltCloseCommunicationPort(FilterPort);
     FltUnregisterFilter( gFilterHandle );
 
     return STATUS_SUCCESS;
@@ -978,10 +982,64 @@ FileBackupPostCreate(
     _In_ FLT_POST_OPERATION_FLAGS Flags
 )
 {
-    UNREFERENCED_PARAMETER(Data);
     UNREFERENCED_PARAMETER(FltObjects);
     UNREFERENCED_PARAMETER(CompletionContext);
-    UNREFERENCED_PARAMETER(Flags);
+    
+    if (Flags & FLTFL_POST_OPERATION_DRAINING) {
+        return FLT_POSTOP_FINISHED_PROCESSING;
+    }
+
+    const auto& params = Data->Iopb->Parameters.Create;
+    if (KernelMode == Data->RequestorMode 
+        || 0 == (params.SecurityContext->DesiredAccess & FILE_WRITE_DATA)
+        || FILE_DOES_NOT_EXIST == Data->IoStatus.Information)
+    {
+        // kernel caller, not write access or a new file - skip
+        return FLT_POSTOP_FINISHED_PROCESSING;
+    }
+
+    fibo::kernel::FilterFileNameInfo fileNameInfo(Data);
+    if (!fileNameInfo) {
+        return FLT_POSTOP_FINISHED_PROCESSING;
+    }
+
+    if (!NT_SUCCESS(fileNameInfo.parse())) {
+        return FLT_POSTOP_FINISHED_PROCESSING;
+    }
+
+    if (!IsBackupDirectory(&fileNameInfo->ParentDir)) {
+        return FLT_POSTOP_FINISHED_PROCESSING;
+    }
+
+    // if it's not the default stream, we don't care
+    if (fileNameInfo->Stream.Length > 0) {
+        return FLT_POSTOP_FINISHED_PROCESSING;
+    }
+
+    // allocate and initialize a file context
+    FileContext* context = nullptr;
+    auto status = FltAllocateContext(FltObjects->Filter, FLT_FILE_CONTEXT, sizeof(FileContext), PagedPool, (PFLT_CONTEXT*)&context);
+    if (!NT_SUCCESS(status)) {
+        KdPrint(("Failed to allocate file context (0x%08X)\n", status));
+        return FLT_POSTOP_FINISHED_PROCESSING;
+    }
+
+    context->Written = FALSE;
+    context->FileName.MaximumLength = fileNameInfo->Name.Length;
+    context->FileName.Buffer = (WCHAR*)ExAllocatePoolWithTag(PagedPool, fileNameInfo->Name.Length, DRIVER_TAG);
+    if (!context->FileName.Buffer) {
+        FltReleaseContext(context);
+        return FLT_POSTOP_FINISHED_PROCESSING;
+    }
+    RtlCopyUnicodeString(&context->FileName, &fileNameInfo->Name);
+    context->Lock.init();
+    status = FltSetFileContext(FltObjects->Instance, FltObjects->FileObject, FLT_SET_CONTEXT_KEEP_IF_EXISTS, context, nullptr);
+    if (!NT_SUCCESS(status)) {
+        KdPrint(("Failed to set file context (0x%08X)\n", status));
+        ExFreePool(context->FileName.Buffer);
+    }
+    FltReleaseContext(context);
+
     return FLT_POSTOP_FINISHED_PROCESSING;
 }
 

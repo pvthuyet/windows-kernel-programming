@@ -37,8 +37,9 @@ NTSTATUS BackupFile(_In_ PUNICODE_STRING FileName, _In_ PCFLT_RELATED_OBJECTS Fl
 	// get source file size
 	LARGE_INTEGER fileSize;
 	status = FsRtlGetFileSize(FltObjects->FileObject, &fileSize);
-	if (!NT_SUCCESS(status) || fileSize.QuadPart == 0)
+	if (!NT_SUCCESS(status) || fileSize.QuadPart == 0) {
 		return status;
+	}
 
 	do {
 		// open source file

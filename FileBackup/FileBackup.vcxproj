@@ -35,6 +35,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\fibo-windows-kernel-lib\FiboKernelLib\ke_filename_info.cpp" />
     <ClCompile Include="..\..\fibo-windows-kernel-lib\FiboKernelLib\ke_mutex.cpp" />
     <ClCompile Include="..\..\fibo-windows-kernel-lib\FiboKernelLib\ke_utility.cpp" />
     <ClCompile Include="..\..\fibo-windows-kernel-lib\FiboKernelLib\ke_wstring.cpp" />
@@ -221,6 +222,7 @@
     <ClInclude Include="..\..\fibo-windows-kernel-lib\FiboKernelLib\ke_algorithm.h" />
     <ClInclude Include="..\..\fibo-windows-kernel-lib\FiboKernelLib\ke_constant.h" />
     <ClInclude Include="..\..\fibo-windows-kernel-lib\FiboKernelLib\ke_define.h" />
+    <ClInclude Include="..\..\fibo-windows-kernel-lib\FiboKernelLib\ke_filename_info.h" />
     <ClInclude Include="..\..\fibo-windows-kernel-lib\FiboKernelLib\ke_logger.h" />
     <ClInclude Include="..\..\fibo-windows-kernel-lib\FiboKernelLib\ke_mutex.h" />
     <ClInclude Include="..\..\fibo-windows-kernel-lib\FiboKernelLib\ke_utility.h" />
