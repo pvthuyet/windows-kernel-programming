@@ -10,15 +10,12 @@ bool IsBackupDirectory(_In_ PCUNICODE_STRING directory)
 	bool doBackup = false;
 	fibo::kernel::KeWstring tmp(directory);
 	auto pos = tmp.find(L"\\pictures\\", 0, true);
-
 	doBackup = (pos != fibo::kernel::npos);
-	KE_DBG_PRINT(KEDBG_TRACE_DEBUG, ("[debug] dobk1 = %d", doBackup));
 
 	if (fibo::kernel::npos == pos) 
 	{
 		pos = tmp.find(L"\\documents\\", 0, true);
 		doBackup = (pos != fibo::kernel::npos);
-		KE_DBG_PRINT(KEDBG_TRACE_DEBUG, ("[debug] dobk2 = %d", doBackup));
 	}
 	
 	return doBackup;
@@ -149,6 +146,7 @@ NTSTATUS BackupFile(_In_ PUNICODE_STRING FileName, _In_ PCFLT_RELATED_OBJECTS Fl
 		FILE_END_OF_FILE_INFORMATION info;
 		info.EndOfFile = saveSize;
 		NT_VERIFY(NT_SUCCESS(ZwSetInformationFile(hTargetFile, &ioStatus, &info, sizeof(info), FileEndOfFileInformation)));
+
 	} while (false);
 
 	if (buffer)
