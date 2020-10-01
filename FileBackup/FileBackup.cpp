@@ -25,7 +25,6 @@ Environment:
 
 #pragma prefast(disable:__WARNING_ENCODE_MEMBER_FUNCTION_POINTER, "Not valid for kernel mode drivers")
 
-
 PFLT_FILTER gFilterHandle;
 ULONG_PTR OperationStatusCtx = 1;
 PFLT_PORT FilterPort = nullptr;
@@ -998,16 +997,6 @@ FileBackupPostCreate(
         return FLT_POSTOP_FINISHED_PROCESSING;
     }
 
-    const auto& params = Data->Iopb->Parameters.Create;
-    if (KernelMode == Data->RequestorMode 
-        || 0 == (params.SecurityContext->DesiredAccess & FILE_WRITE_DATA)
-        || FILE_DOES_NOT_EXIST == Data->IoStatus.Information)
-    {
-        // kernel caller, not write access or a new file - skip
-        KdPrint((DRIVER_PREFIX "not write access or a new file\n"));
-        return FLT_POSTOP_FINISHED_PROCESSING;
-    }
-
     fibo::kernel::FilterFileNameInfo fileNameInfo(Data);
     if (!fileNameInfo) {
         KdPrint((DRIVER_PREFIX "Failed to query file name information\n"));
@@ -1019,14 +1008,35 @@ FileBackupPostCreate(
         return FLT_POSTOP_FINISHED_PROCESSING;
     }
 
+    KdPrint((DRIVER_PREFIX "file name: %wZ\n", fileNameInfo->Name));
+
+    const auto& params = Data->Iopb->Parameters.Create;
+    ACCESS_MASK desiredAccess = params.SecurityContext->DesiredAccess;
+
+    KdPrint(("%wZ. RequestorMode=%lu, DesiredAccess=%lu, Information=%lu\n",
+        fileNameInfo->Name,
+        Data->RequestorMode,
+        desiredAccess,
+        Data->IoStatus.Information));
+
+    if (KernelMode == Data->RequestorMode
+        || !FlagOn(desiredAccess, FILE_WRITE_DATA)
+        || FILE_DOES_NOT_EXIST == Data->IoStatus.Information)
+    {
+        // kernel caller, not write access or a new file - skip
+        return FLT_POSTOP_FINISHED_PROCESSING;
+    }
+
+    KdPrint((DRIVER_PREFIX "pass: %wZ. parent dir: %wZ\n", fileNameInfo->Name, fileNameInfo->ParentDir));
+
     if (!IsBackupDirectory(&fileNameInfo->ParentDir)) {
-        KdPrint((DRIVER_PREFIX "Not from backup directory\n"));
+        KE_DBG_PRINT(KEDBG_TRACE_ERROR, (DRIVER_PREFIX ERROR_PREFIX "Not from backup directory\n"));
         return FLT_POSTOP_FINISHED_PROCESSING;
     }
 
     // if it's not the default stream, we don't care
     if (fileNameInfo->Stream.Length > 0) {
-        KdPrint((DRIVER_PREFIX "not the default stream\n"));
+        KE_DBG_PRINT(KEDBG_TRACE_ERROR, (DRIVER_PREFIX ERROR_PREFIX "Not the default stream\n"));
         return FLT_POSTOP_FINISHED_PROCESSING;
     }
 

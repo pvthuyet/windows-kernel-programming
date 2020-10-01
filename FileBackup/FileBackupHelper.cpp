@@ -2,28 +2,25 @@
 #include "FileBackupHelper.h"
 #include "define.h"
 #include "ke_logger.h"
+#include "ke_wstring.h"
 
 bool IsBackupDirectory(_In_ PCUNICODE_STRING directory)
 {
 	// no counted version of wcsstr :(
+	bool doBackup = false;
+	fibo::kernel::KeWstring tmp(directory);
+	auto pos = tmp.find(L"\\pictures\\", 0, true);
 
-	ULONG maxSize = 1024;
-	if (directory->Length > maxSize) {
-		return false;
+	doBackup = (pos != fibo::kernel::npos);
+	KE_DBG_PRINT(KEDBG_TRACE_DEBUG, ("[debug] dobk1 = %d", doBackup));
+
+	if (fibo::kernel::npos == pos) 
+	{
+		pos = tmp.find(L"\\documents\\", 0, true);
+		doBackup = (pos != fibo::kernel::npos);
+		KE_DBG_PRINT(KEDBG_TRACE_DEBUG, ("[debug] dobk2 = %d", doBackup));
 	}
-
-	auto copy = (WCHAR*)ExAllocatePoolWithTag(PagedPool, maxSize + sizeof(WCHAR), DRIVER_TAG);
-	if (!copy) {
-		return false;
-	}
-
-	RtlZeroMemory(copy, maxSize + sizeof(WCHAR));
-	auto count = directory->Length / sizeof(WCHAR);
-	wcsncpy_s(copy, 1 + maxSize / sizeof(WCHAR), directory->Buffer, count);
-	_wcslwr_s(copy, count);
-	bool doBackup = wcsstr(copy, L"\\pictures\\") || wcsstr(copy, L"\\documents\\");
-	ExFreePoolWithTag(copy, DRIVER_TAG);
-
+	
 	return doBackup;
 }
 

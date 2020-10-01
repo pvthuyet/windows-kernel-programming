@@ -39,6 +39,7 @@
     <ClCompile Include="..\..\fibo-windows-kernel-lib\FiboKernelLib\ke_mutex.cpp" />
     <ClCompile Include="..\..\fibo-windows-kernel-lib\FiboKernelLib\ke_utility.cpp" />
     <ClCompile Include="..\..\fibo-windows-kernel-lib\FiboKernelLib\ke_wstring.cpp" />
+    <ClCompile Include="..\..\fibo-windows-kernel-lib\FiboKernelLib\ke_strutils.cpp" />
     <ClCompile Include="FileBackupHelper.cpp" />
     <ClCompile Include="stdafx.cpp" />
     <ResourceCompile Include="FileBackup.rc" />
@@ -227,6 +228,7 @@
     <ClInclude Include="..\..\fibo-windows-kernel-lib\FiboKernelLib\ke_mutex.h" />
     <ClInclude Include="..\..\fibo-windows-kernel-lib\FiboKernelLib\ke_utility.h" />
     <ClInclude Include="..\..\fibo-windows-kernel-lib\FiboKernelLib\ke_wstring.h" />
+    <ClInclude Include="..\..\fibo-windows-kernel-lib\FiboKernelLib\ke_strutils.h" />
     <ClInclude Include="define.h" />
     <ClInclude Include="FileBackup.h" />
     <ClInclude Include="FileBackupCommon.h" />
