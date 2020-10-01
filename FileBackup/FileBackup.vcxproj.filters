@@ -56,6 +56,12 @@
     <ClCompile Include="..\..\fibo-windows-kernel-lib\FiboKernelLib\ke_strutils.cpp">
       <Filter>fibo lib</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\fibo-windows-kernel-lib\FiboKernelLib\ke_memory.cpp">
+      <Filter>fibo lib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\fibo-windows-kernel-lib\FiboKernelLib\ke_scoped_unicode_string.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="FileBackup.h">
@@ -99,6 +105,12 @@
     </ClInclude>
     <ClInclude Include="..\..\fibo-windows-kernel-lib\FiboKernelLib\ke_strutils.h">
       <Filter>fibo lib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\fibo-windows-kernel-lib\FiboKernelLib\ke_memory.h">
+      <Filter>fibo lib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\fibo-windows-kernel-lib\FiboKernelLib\ke_scoped_unicode_string.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

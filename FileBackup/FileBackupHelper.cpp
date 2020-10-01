@@ -3,6 +3,7 @@
 #include "define.h"
 #include "ke_logger.h"
 #include "ke_wstring.h"
+#include "ke_scoped_unicode_string.h"
 
 bool IsBackupDirectory(_In_ PCUNICODE_STRING directory)
 {
@@ -57,22 +58,27 @@ NTSTATUS BackupFile(_In_ PUNICODE_STRING FileName, _In_ PCFLT_RELATED_OBJECTS Fl
 			nullptr, 0,				// extended attributes, EA length
 			IO_IGNORE_SHARE_ACCESS_CHECK);	// flags
 
-		if (!NT_SUCCESS(status))
+		if (!NT_SUCCESS(status)) {
 			break;
+		}
 
 		// open target file
-		UNICODE_STRING targetFileName;
 		const WCHAR backupStream[] = L":backup";
-		targetFileName.MaximumLength = FileName->Length + sizeof(backupStream);
-		targetFileName.Buffer = (WCHAR*)ExAllocatePoolWithTag(PagedPool, targetFileName.MaximumLength, DRIVER_TAG);
-		if (targetFileName.Buffer == nullptr)
-			return STATUS_INSUFFICIENT_RESOURCES;
+		USHORT bkFileNameLength = FileName->Length + sizeof(backupStream);
+		fibo::kernel::ScopedUnicodeString bkFileName;
+		status = bkFileName.allocate(bkFileNameLength, PagedPool, DRIVER_TAG);
+		if (!NT_SUCCESS(status)) {
+			break;
+		}
 
-		RtlCopyUnicodeString(&targetFileName, FileName);
-		RtlAppendUnicodeToString(&targetFileName, backupStream);
+		bkFileName.copy(FileName);
+		status = bkFileName.append(backupStream);
+		if (!NT_SUCCESS(status)) {
+			break;
+		}
 
 		OBJECT_ATTRIBUTES targetFileAttr;
-		InitializeObjectAttributes(&targetFileAttr, &targetFileName,
+		InitializeObjectAttributes(&targetFileAttr, bkFileName.get(),
 			OBJ_KERNEL_HANDLE | OBJ_CASE_INSENSITIVE, nullptr, nullptr);
 
 		status = FltCreateFile(
@@ -88,8 +94,6 @@ NTSTATUS BackupFile(_In_ PUNICODE_STRING FileName, _In_ PCFLT_RELATED_OBJECTS Fl
 			FILE_SYNCHRONOUS_IO_NONALERT | FILE_SEQUENTIAL_ONLY, // create options (sync I/O)
 			nullptr, 0,		// extended attributes, EA length
 			0 /*IO_IGNORE_SHARE_ACCESS_CHECK*/);	// flags
-
-		ExFreePool(targetFileName.Buffer);
 
 		if (!NT_SUCCESS(status))
 			break;

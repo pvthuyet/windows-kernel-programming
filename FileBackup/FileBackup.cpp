@@ -1104,6 +1104,7 @@ FileBackupPreWrite(
             }
             else
             {
+                KdPrint((DRIVER_PREFIX "Backup file successful\n"));
                 // send message to user mode
                 if (SendClientPort)
                 {
