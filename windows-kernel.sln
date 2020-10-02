@@ -35,6 +35,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FileBackup", "FileBackup\Fi
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FileBackupMon", "FileBackupMon\FileBackupMon.vcxproj", "{7940BE42-6C79-4697-98EE-DD6883D1A97F}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FileBackupRestore", "FileBackupRestore\FileBackupRestore.vcxproj", "{405CC23B-0DDB-4C86-AE79-11D6193DE90C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM = Debug|ARM
@@ -335,6 +337,18 @@ Global
 		{7940BE42-6C79-4697-98EE-DD6883D1A97F}.Release|x64.Build.0 = Release|x64
 		{7940BE42-6C79-4697-98EE-DD6883D1A97F}.Release|x86.ActiveCfg = Release|Win32
 		{7940BE42-6C79-4697-98EE-DD6883D1A97F}.Release|x86.Build.0 = Release|Win32
+		{405CC23B-0DDB-4C86-AE79-11D6193DE90C}.Debug|ARM.ActiveCfg = Debug|Win32
+		{405CC23B-0DDB-4C86-AE79-11D6193DE90C}.Debug|ARM64.ActiveCfg = Debug|Win32
+		{405CC23B-0DDB-4C86-AE79-11D6193DE90C}.Debug|x64.ActiveCfg = Debug|x64
+		{405CC23B-0DDB-4C86-AE79-11D6193DE90C}.Debug|x64.Build.0 = Debug|x64
+		{405CC23B-0DDB-4C86-AE79-11D6193DE90C}.Debug|x86.ActiveCfg = Debug|Win32
+		{405CC23B-0DDB-4C86-AE79-11D6193DE90C}.Debug|x86.Build.0 = Debug|Win32
+		{405CC23B-0DDB-4C86-AE79-11D6193DE90C}.Release|ARM.ActiveCfg = Release|Win32
+		{405CC23B-0DDB-4C86-AE79-11D6193DE90C}.Release|ARM64.ActiveCfg = Release|Win32
+		{405CC23B-0DDB-4C86-AE79-11D6193DE90C}.Release|x64.ActiveCfg = Release|x64
+		{405CC23B-0DDB-4C86-AE79-11D6193DE90C}.Release|x64.Build.0 = Release|x64
+		{405CC23B-0DDB-4C86-AE79-11D6193DE90C}.Release|x86.ActiveCfg = Release|Win32
+		{405CC23B-0DDB-4C86-AE79-11D6193DE90C}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
