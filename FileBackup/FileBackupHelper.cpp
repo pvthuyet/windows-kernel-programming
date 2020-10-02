@@ -10,15 +10,7 @@ bool IsBackupDirectory(_In_ PCUNICODE_STRING directory)
 	// no counted version of wcsstr :(
 	bool doBackup = false;
 	fibo::kernel::KeWstring tmp(directory);
-	auto pos = tmp.find(L"\\pictures\\", 0, true);
-	doBackup = (pos != fibo::kernel::npos);
-
-	if (fibo::kernel::npos == pos) 
-	{
-		pos = tmp.find(L"\\documents\\", 0, true);
-		doBackup = (pos != fibo::kernel::npos);
-	}
-	
+	doBackup = tmp.contain(L"\\pictures\\", 0, true) || tmp.contain(L"\\documents\\", 0, true);
 	return doBackup;
 }
 
@@ -65,13 +57,8 @@ NTSTATUS BackupFile(_In_ PUNICODE_STRING FileName, _In_ PCFLT_RELATED_OBJECTS Fl
 		// open target file
 		const WCHAR backupStream[] = L":backup";
 		USHORT bkFileNameLength = FileName->Length + sizeof(backupStream);
-		fibo::kernel::ScopedUnicodeString bkFileName;
-		status = bkFileName.allocate(bkFileNameLength, PagedPool, DRIVER_TAG);
-		if (!NT_SUCCESS(status)) {
-			break;
-		}
+		fibo::kernel::ScopedUnicodeString bkFileName(bkFileNameLength, FileName, PagedPool, DRIVER_TAG);
 
-		bkFileName.copy(FileName);
 		status = bkFileName.append(backupStream);
 		if (!NT_SUCCESS(status)) {
 			break;

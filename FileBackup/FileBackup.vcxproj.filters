@@ -60,7 +60,7 @@
       <Filter>fibo lib</Filter>
     </ClCompile>
     <ClCompile Include="..\..\fibo-windows-kernel-lib\FiboKernelLib\ke_scoped_unicode_string.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>fibo lib</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -110,7 +110,7 @@
       <Filter>fibo lib</Filter>
     </ClInclude>
     <ClInclude Include="..\..\fibo-windows-kernel-lib\FiboKernelLib\ke_scoped_unicode_string.h">
-      <Filter>Header Files</Filter>
+      <Filter>fibo lib</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
