@@ -7,6 +7,8 @@ DRIVER_DISPATCH DevMonDeviceControl, HandleFilterFunction;
 
 DevMonManager g_Data;
 
+NTSTATUS CompleteRequest(PIRP Irp, NTSTATUS status = STATUS_SUCCESS, ULONG_PTR information = 0);
+
 extern "C" NTSTATUS
 DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)
 {
@@ -49,4 +51,41 @@ void DevMonUnload(PDRIVER_OBJECT DriverObject)
 	IoDeleteDevice(g_Data.CDO);
 
 	g_Data.RemoveAllDevices();
+}
+
+NTSTATUS CompleteRequest(PIRP Irp, NTSTATUS status, ULONG_PTR information) 
+{
+	Irp->IoStatus.Status = status;
+	Irp->IoStatus.Information = information;
+	IoCompleteRequest(Irp, IO_NO_INCREMENT);
+	return status;
+}
+
+NTSTATUS HandleFilterFunction(PDEVICE_OBJECT DeviceObject, PIRP Irp)
+{
+	if (DeviceObject == g_Data.CDO)
+	{
+		switch (IoGetCurrentIrpStackLocation(Irp)->MajorFunction)
+		{
+		case IRP_MJ_CREATE:
+		case IRP_MJ_CLOSE:
+				return CompleteRequest(Irp);
+			
+		case IRP_MJ_DEVICE_CONTROL:
+				return DevMonDeviceControl(DeviceObject, Irp);
+		}
+		return CompleteRequest(Irp, STATUS_INVALID_DEVICE_REQUEST);
+	}
+
+	auto ext = (DeviceExtension*)DeviceObject->DeviceExtension;
+	
+	auto thread = Irp->Tail.Overlay.Thread;
+	HANDLE tid = nullptr, pid = nullptr;
+	if (thread)
+	{
+		tid = PsGetThreadId(thread);
+		pid = PsGetThreadProcessId(thread);
+	}
+
+	auto stack = IoGetCurrentIrpStackLocation(Irp);
 }
