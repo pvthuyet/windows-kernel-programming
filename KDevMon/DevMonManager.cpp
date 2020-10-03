@@ -60,16 +60,47 @@ NTSTATUS DevMonManager::AddDevice(PCWSTR name)
 				Devices[i].DeviceName.MaximumLength = targetName.Length;
 				RtlCopyUnicodeString(&Devices[i].DeviceName, &targetName);
 				Devices[i].DeviceObject = DeviceObject;
-				//++ todo
 
+				status = IoAttachDeviceToDeviceStackSafe(
+					DeviceObject,			// filter device object
+					LowerDeviceObject,		// target device object
+					&ext->LowerDeviceObject);	// result
 
+				if (!NT_SUCCESS(status)) {
+					break;
+				}
+
+				Devices[i].LowerDeviceObject = ext->LowerDeviceObject;
+				// hardware based devices require this
+				DeviceObject->Flags &= ~DO_DEVICE_INITIALIZING;
+				DeviceObject->Flags |= DO_POWER_PAGABLE;
+
+				MonitoredDeviceCount++;
 
 			} while(false);
+
+			if (!NT_SUCCESS(status)) 
+			{
+				if (buffer)
+					ExFreePool(buffer);
+				if (DeviceObject)
+					IoDeleteDevice(DeviceObject);
+				Devices[i].DeviceObject = nullptr;
+			}
+
+			if (LowerDeviceObject) 
+			{
+				// dereference - not needed anymore
+				ObDereferenceObject(FileObject);
+			}
+
+			return status;
 		}
 	}
 
-
-	return STATUS_SUCCESS;
+	// should never get here
+	NT_ASSERT(false);
+	return STATUS_UNSUCCESSFUL;
 }
 
 int DevMonManager::FindDevice(PCWSTR name) const
