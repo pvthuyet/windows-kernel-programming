@@ -1,6 +1,7 @@
 #include <ntddk.h>
 #include "KDevMon.h"
 #include "DevMonManager.h"
+#include "KDevMonCommon.h"
 
 DRIVER_UNLOAD DevMonUnload;
 DRIVER_DISPATCH DevMonDeviceControl, HandleFilterFunction;
@@ -15,7 +16,7 @@ DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)
 	UNREFERENCED_PARAMETER(DriverObject);
 	UNREFERENCED_PARAMETER(RegistryPath);
 
-	UNICODE_STRING devName = RTL_CONSTANT_STRING(L"\\Device\\KDevMon");
+	UNICODE_STRING devName = RTL_CONSTANT_STRING(DEVICE_NAME);
 	PDEVICE_OBJECT DeviceObject;
 
 	auto status = IoCreateDevice(DriverObject, 0, &devName, FILE_DEVICE_UNKNOWN, 0, TRUE, &DeviceObject);
@@ -23,7 +24,7 @@ DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)
 		return status;
 	}
 
-	UNICODE_STRING linkName = RTL_CONSTANT_STRING(L"\\??\\KDevMon");
+	UNICODE_STRING linkName = RTL_CONSTANT_STRING(DEVICE_LINK);
 	status = IoCreateSymbolicLink(&linkName, &devName);
 	if (!NT_SUCCESS(status)) {
 		IoDeleteDevice(DeviceObject);
@@ -45,7 +46,7 @@ DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)
 void DevMonUnload(PDRIVER_OBJECT DriverObject) 
 {
 	UNREFERENCED_PARAMETER(DriverObject);
-	UNICODE_STRING linkName = RTL_CONSTANT_STRING(L"\\??\\KDevMon");
+	UNICODE_STRING linkName = RTL_CONSTANT_STRING(DEVICE_LINK);
 	IoDeleteSymbolicLink(&linkName);
 	NT_ASSERT(g_Data.CDO);
 	IoDeleteDevice(g_Data.CDO);
@@ -88,4 +89,12 @@ NTSTATUS HandleFilterFunction(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 	}
 
 	auto stack = IoGetCurrentIrpStackLocation(Irp);
+
+	DbgPrint("driver: %wZ: PID: %d, TID: %d, MJ=%d (%s)\n",
+		&ext->LowerDeviceObject->DriverObject->DriverName,
+		HandleToUlong(pid), HandleToUlong(tid),
+		stack->MajorFunction, MajorFunctionToString(stack->MajorFunction));
+
+	IoSkipCurrentIrpStackLocation(Irp);
+	return IoCallDriver(ext->LowerDeviceObject, Irp);
 }
