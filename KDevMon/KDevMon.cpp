@@ -127,7 +127,7 @@ NTSTATUS HandleFilterFunction(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 
 	auto stack = IoGetCurrentIrpStackLocation(Irp);
 
-	DbgPrint(("driver: %wZ: PID: %d, TID: %d, MJ=%d (%s)\n",
+	KdPrint((DRIVER_PREFIX "driver: %wZ: PID: %d, TID: %d, MJ=%d (%s)\n",
 		&ext->LowerDeviceObject->DriverObject->DriverName,
 		HandleToUlong(pid), HandleToUlong(tid),
 		stack->MajorFunction, MajorFunctionToString(stack->MajorFunction)));
@@ -147,6 +147,7 @@ NTSTATUS DevMonDeviceControl(PDEVICE_OBJECT, PIRP Irp)
 	case IOCTL_DEVMON_ADD_DEVICE:
 	case IOCTL_DEVMON_REMOVE_DEVICE:
 		{
+			KdPrint((DRIVER_PREFIX "DevMonDeviceControl %lu", code));
 			auto buffer = (WCHAR*)Irp->AssociatedIrp.SystemBuffer;
 			auto len = stack->Parameters.DeviceIoControl.InputBufferLength;
 			if (buffer == nullptr || len > 512)
